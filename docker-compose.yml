@@ -1,0 +1,50 @@
+services:
+  # 1. Frontend (React + Nginx)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: osvss_frontend
+    ports:
+      - "8888:80" 
+    depends_on:
+      - backend
+    restart: always
+
+  # 2. Backend API (Bun)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: osvss_backend
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - PORT=${PORT}
+    env_file:
+      - .env 
+    volumes:
+      - os_patient_storage:/app/uploads
+    depends_on:
+      - postgres-db
+    restart: always
+
+  # 3. Database (PostgreSQL)
+  postgres-db:
+    image: postgres:15-alpine
+    container_name: os_clinic_postgres
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      # Comment this out in production to lock down the DB
+      - "127.0.0.1:5434:5432" 
+    restart: always
+
+volumes:
+  postgres_data:
+    driver: local
+  os_patient_storage:
+    driver: local

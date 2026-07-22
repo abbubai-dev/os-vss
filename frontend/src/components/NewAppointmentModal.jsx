@@ -30,6 +30,18 @@ export default function NewAppointmentModal({ isOpen, onClose, token, selectedDa
     fetchBookedSlots();
   }, [formData.appt_date, isOpen, token]);
 
+  // NEW: Reset form every time the modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setFormData({
+        name: '', ic_number: '', phone_number: '', gender: 'Male',
+        appt_date: selectedDate, appt_time: '', source: 'KPP', treatment: 'MOS', notes: ''
+      });
+      setError('');
+      setAutoFillSuccess(false);
+    }
+  }, [isOpen, selectedDate]);
+
   if (!isOpen) return null;
 
   const handleChange = (e) => {

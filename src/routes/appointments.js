@@ -70,9 +70,9 @@ export async function handleAppointments(req) {
       const { name, ic_number, phone_number, gender, appt_date, appt_time, source, treatment, notes } = body;
 
       // Validate operational constraints
-      if (!verifyOperationalDate(appt_date)) {
-        return new Response(JSON.stringify({ error: 'Selected date is not a valid bi-weekly Oral Surgery clinic day.' }), { status: 400 });
-      }
+     // if (!verifyOperationalDate(appt_date)) {
+     //   return new Response(JSON.stringify({ error: 'Selected date is not a valid bi-weekly Oral Surgery clinic day.' }), { status: 400 });
+     // }
 
       // Step A: Upsert Patient (Find existing by IC, or create a new profile)
       let patientRes = await pool.query('SELECT id FROM patients WHERE ic_number = $1', [ic_number]);

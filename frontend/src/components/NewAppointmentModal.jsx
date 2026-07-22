@@ -193,6 +193,7 @@ export default function NewAppointmentModal({ isOpen, onClose, token, selectedDa
                 <option value="KPSS">KPSS</option>
                 <option value="KPKK">KPKK</option>
                 <option value="ED">ED (Oncall)</option>
+                <option value="Hosp. Taiping">Hosp.Taiping</option>
                 <option value="Others">Others</option>
               </select>
             </div>

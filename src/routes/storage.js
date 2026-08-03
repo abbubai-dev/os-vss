@@ -42,15 +42,16 @@ export async function handleStorage(req) {
     }
   }
 
-  // 3. POST /api/storage/save-record (Saves the Cloudflare URL to PostgreSQL) <-- NEW ROUTE (Fixes 404)
+  // 3. POST /api/storage/save-record (Saves the Cloudflare URL to PostgreSQL)
   if (method === 'POST' && url.pathname === '/api/storage/save-record') {
     try {
       const { patient_id, file_path, file_type, file_name } = await req.json();
       
+      // FIX: Removed 'file_path' column, saving the Cloudflare key directly into 'file_url'
       const result = await pool.query(
-        `INSERT INTO attachments (patient_id, file_path, file_type, file_name, file_url) 
-         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-        [patient_id, file_path, file_type, file_name, file_path] // Using file_path as URL identifier for R2
+        `INSERT INTO attachments (patient_id, file_type, file_name, file_url) 
+         VALUES ($1, $2, $3, $4) RETURNING *`,
+        [patient_id, file_type, file_name, file_path] 
       );
 
       return new Response(JSON.stringify({ success: true, data: result.rows[0] }), { status: 201 });

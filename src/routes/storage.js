@@ -1,4 +1,6 @@
 import { generateUploadUrl, generateViewUrl } from '../r2.js';
+import crypto from 'crypto';            // <-- FIX: Added missing crypto import (Fixes 502)
+import pool from '../config/db.js';     // <-- FIX: Added database connection
 
 export async function handleStorage(req) {
   const url = new URL(req.url);
@@ -10,7 +12,6 @@ export async function handleStorage(req) {
       const body = await req.json();
       const { patientId, filename, contentType } = body;
 
-      // Create a unique file path inside the R2 bucket
       const uniqueFilename = `${crypto.randomUUID()}-${filename}`;
       const fileKey = `scans/${patientId}/${uniqueFilename}`;
 
@@ -37,6 +38,24 @@ export async function handleStorage(req) {
       return new Response(JSON.stringify({ viewUrl }), { status: 200 });
     } catch (err) {
       console.error('R2 View Error:', err);
+      return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+    }
+  }
+
+  // 3. POST /api/storage/save-record (Saves the Cloudflare URL to PostgreSQL) <-- NEW ROUTE (Fixes 404)
+  if (method === 'POST' && url.pathname === '/api/storage/save-record') {
+    try {
+      const { patient_id, file_path, file_type, file_name } = await req.json();
+      
+      const result = await pool.query(
+        `INSERT INTO attachments (patient_id, file_path, file_type, file_name, file_url) 
+         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        [patient_id, file_path, file_type, file_name, file_path] // Using file_path as URL identifier for R2
+      );
+
+      return new Response(JSON.stringify({ success: true, data: result.rows[0] }), { status: 201 });
+    } catch (err) {
+      console.error('Database Save Error:', err);
       return new Response(JSON.stringify({ error: err.message }), { status: 500 });
     }
   }

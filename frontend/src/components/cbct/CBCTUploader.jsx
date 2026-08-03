@@ -39,9 +39,9 @@ export default function CBCTUploader({ patientId, token, onUploadSuccess }) {
 
       if (!r2Res.ok) throw new Error("Failed to upload to R2");
 
-      // Step 3: Save the fileKey to your PostgreSQL database
+      /// Step 3: Save the fileKey to your PostgreSQL database
       setStatus('Saving record to database...');
-      const dbRes = await fetch('/api/attachments', {
+      const dbRes = await fetch('/api/storage/save-record', {    // <-- CHANGED URL
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -49,8 +49,9 @@ export default function CBCTUploader({ patientId, token, onUploadSuccess }) {
         },
         body: JSON.stringify({
           patient_id: patientId,
-          file_path: fileKey, // We save 'scans/123/cbct.zip' in Postgres, NOT the file itself!
-          file_type: 'CBCT_ZIP'
+          file_path: fileKey,
+          file_type: 'CBCT_ZIP',
+          file_name: file.name   // <-- Added filename so it looks nice in the drawer list
         })
       });
 

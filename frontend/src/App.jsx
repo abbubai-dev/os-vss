@@ -4,6 +4,8 @@ import Calendar from './components/Calendar';
 import NewAppointmentModal from './components/NewAppointmentModal';
 import PatientSearchModal from './components/PatientSearchModal';
 import osvssLogo from './assets/OSVSS-logo.png';
+import CBCTUploader from './components/cbct/CBCTUploader';
+import CBCTViewerButton from './components/cbct/CBCTViewerButton';
 
 const TIME_SLOTS = [
   '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', 
@@ -586,7 +588,9 @@ function App() {
               {/* Drawer: Uploads Section */}
               <div className="mb-6">
                 <h3 className="text-xs uppercase text-gray-400 font-bold mb-3 tracking-wider">Documents</h3>
-                <form onSubmit={handleUpload} className="flex flex-col gap-2 mb-5 p-4 border-2 border-dashed border-gray-200 rounded-lg bg-slate-50">
+                
+                {/* 1. Standard File Upload (VPS Storage) */}
+                <form onSubmit={handleUpload} className="flex flex-col gap-2 mb-3 p-4 border-2 border-dashed border-gray-200 rounded-lg bg-slate-50">
                   <div className="flex gap-2">
                     <select 
                       value={fileType} 
@@ -612,7 +616,23 @@ function App() {
                     {isUploading ? 'Uploading...' : 'Upload File'}
                   </button>
                 </form>
+
+                {/* 2. CBCT Cloud Upload (Cloudflare R2 Storage) */}
+                <div className="mb-5">
+                  <CBCTUploader 
+                    patientId={selectedPatient.patient_id} 
+                    token={token} 
+                    onUploadSuccess={() => {
+                      // Silently re-fetch the attachments list when R2 upload finishes
+                      fetch(`/api/attachments/${selectedPatient.patient_id}`, { headers: getAuthHeaders() })
+                        .then(res => res.json())
+                        .then(result => setAttachments(result.data))
+                        .catch(err => console.error(err));
+                    }} 
+                  />
+                </div>
                 
+                {/* 3. Attachments List */}
                 <ul className="space-y-3">
                   {attachments.map(file => (
                     <li key={file.id} className="flex justify-between items-center p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
@@ -621,17 +641,26 @@ function App() {
                           {file.file_type}
                         </span>
                         <span className="text-sm font-semibold text-gray-700">
-                          {file.file_name}
+                          {file.file_name || 'Attached File'}
                         </span>
                       </div>
-                      <a 
-                        href={file.file_url} 
-                        target="_blank" 
-                        rel="noreferrer" 
-                        className="text-[#1E3A8A] text-sm font-bold bg-blue-50 px-3 py-1 rounded-full hover:bg-blue-100"
-                      >
-                        View
-                      </a>
+                      
+                      {/* Smart Button Logic: If it's a CBCT, use the secure R2 Viewer Button. Otherwise, use standard download link. */}
+                      {file.file_type === 'CBCT_ZIP' ? (
+                        <CBCTViewerButton 
+                          fileKey={file.file_path || file.file_url} 
+                          token={token} 
+                        />
+                      ) : (
+                        <a 
+                          href={file.file_url} 
+                          target="_blank" 
+                          rel="noreferrer" 
+                          className="text-[#1E3A8A] text-sm font-bold bg-blue-50 px-3 py-1 rounded-full hover:bg-blue-100"
+                        >
+                          View
+                        </a>
+                      )}
                     </li>
                   ))}
                 </ul>

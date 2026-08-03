@@ -3,6 +3,7 @@ import { handleFiles } from './routes/files.js';
 import { handleAuth } from './routes/auth.js';
 import { verifyToken } from './middleware/jwtAuth.js';
 import { handlePatients } from './routes/patients.js';
+import { handleStorage } from './routes/storage.js';
 
 const PORT = process.env.PORT || 3000;
 
@@ -48,6 +49,11 @@ Bun.serve({
 
       if (url.pathname.startsWith('/api/patients')) {
         return handlePatients(req);
+      }
+      
+      // <-- THIS BLOCK FOR CLOUDFLARE R2
+      if (url.pathname.startsWith('/api/storage')) {
+        return handleStorage(req);
       }
     }
 

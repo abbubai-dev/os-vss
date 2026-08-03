@@ -48,9 +48,10 @@ export async function handleAppointments(req) {
         WHERE status = 'Scheduled' AND appt_date < CURRENT_DATE
       `);
 
-      // Fetch the queue, hiding 'Deleted' patients
+      // Fetch the queue, hiding 'Deleted' patients, and check for attachments
       const queryText = `
-        SELECT a.*, p.name, p.ic_number, p.phone_number, p.gender
+        SELECT a.*, p.name, p.ic_number, p.phone_number, p.gender,
+               EXISTS(SELECT 1 FROM attachments att WHERE att.patient_id = p.id) as has_attachments
         FROM appointments a
         JOIN patients p ON a.patient_id = p.id
         WHERE a.appt_date = $1 AND a.status != 'Deleted'
@@ -196,6 +197,24 @@ export async function handleAppointments(req) {
       );
       if (result.rowCount === 0) return new Response(JSON.stringify({ error: 'Appointment not found' }), { status: 404 });
       return new Response(JSON.stringify({ success: true }), { status: 200 });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+    }
+  }
+
+  // 7. PATCH /api/appointments/:id/notes (Update Initial Notes)
+  if (method === 'PATCH' && url.pathname.match(/^\/api\/appointments\/[^\/]+\/notes$/)) {
+    try {
+      const id = url.pathname.split('/')[3];
+      const { notes } = await req.json();
+      
+      const result = await pool.query(
+        `UPDATE appointments SET notes = $1 WHERE id = $2 RETURNING *`,
+        [notes, id]
+      );
+      
+      if (result.rowCount === 0) return new Response(JSON.stringify({ error: 'Appointment not found' }), { status: 404 });
+      return new Response(JSON.stringify({ success: true, data: result.rows[0] }), { status: 200 });
     } catch (err) {
       return new Response(JSON.stringify({ error: err.message }), { status: 500 });
     }

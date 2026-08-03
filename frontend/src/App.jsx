@@ -69,7 +69,11 @@ function App() {
   const [nextDate, setNextDate] = useState('2026-07-21');
   const [nextTime, setNextTime] = useState('');
   const [checkoutNotes, setCheckoutNotes] = useState('');
-  const [bookedSlots, setBookedSlots] = useState([]); 
+  const [bookedSlots, setBookedSlots] = useState([]);
+
+  // Notes Editing States
+  const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const [editNoteValue, setEditNoteValue] = useState('');
 
   const getAuthHeaders = (json = true) => {
     const headers = { 'Authorization': `Bearer ${token}` };
@@ -130,6 +134,8 @@ function App() {
     setIsRescheduling(false);
     setNextTime('');
     setCheckoutNotes('');
+    setIsEditingNotes(false);
+    setEditNoteValue(patient.notes || '');
     setIsDrawerOpen(true);
     
     try {
@@ -158,6 +164,24 @@ function App() {
       }
     } catch (error) { 
       console.error(error); 
+    }
+  };
+
+  const handleSaveNotes = async () => {
+    try {
+      const response = await fetch(`/api/appointments/${selectedPatient.id}/notes`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ notes: editNoteValue })
+      });
+      if (response.ok) {
+        // Instantly update the UI without closing the drawer
+        setSelectedPatient(prev => ({...prev, notes: editNoteValue}));
+        setRefreshKey(old => old + 1); 
+        setIsEditingNotes(false);
+      }
+    } catch (error) {
+      console.error("Failed to update notes", error);
     }
   };
 
@@ -367,7 +391,22 @@ function App() {
                     className="hover:bg-slate-50 transition-colors cursor-pointer"
                   >
                     <td className="p-4 font-bold text-gray-800">{appt.appt_time.slice(0, 5)}</td>
-                    <td className="p-4 text-gray-800 font-bold">{appt.name}</td>
+                    <td className="p-4">
+                      <div className="flex items-center gap-2">
+                        {appt.has_attachments && (
+                          <svg 
+                            className="w-4 h-4 text-[#0D9488]" 
+                            fill="none" 
+                            stroke="currentColor" 
+                            viewBox="0 0 24 24" 
+                            title="Has Attachments"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path>
+                          </svg>
+                        )}
+                        <span className="text-gray-800 font-bold">{appt.name}</span>
+                      </div>
+                    </td>
                     <td className="p-4 text-gray-600">{appt.ic_number}</td>
                     <td className="p-4 text-gray-600 font-semibold">{appt.source}</td>
                     <td className="p-4 text-gray-600">{appt.treatment}</td>
@@ -447,11 +486,51 @@ function App() {
                     <p className="font-extrabold text-[#1E3A8A]">{selectedPatient.treatment}</p>
                   </div>
                   <div className="col-span-2 mt-2 pt-3 border-t border-gray-100">
-                    <p className="text-gray-500 font-bold text-[10px] uppercase tracking-wider mb-2">Initial Notes</p>
+                    <div className="flex justify-between items-center mb-2">
+                      <p className="text-gray-500 font-bold text-[10px] uppercase tracking-wider">Initial Notes</p>
+                      
+                      {/* Pencil Icon Button */}
+                      {!isEditingNotes && (
+                        <button 
+                          onClick={() => setIsEditingNotes(true)} 
+                          className="text-gray-400 hover:text-[#0D9488] transition-colors p-1"
+                          title="Edit Notes"
+                        >
+                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                        </button>
+                      )}
+                    </div>
+
                     <div className="bg-slate-50 p-3 rounded-md border border-slate-200">
-                      <p className="text-gray-700 font-medium italic">
-                        {selectedPatient.notes ? `"${selectedPatient.notes}"` : "No notes provided."}
-                      </p>
+                      {isEditingNotes ? (
+                        <div className="flex flex-col gap-2">
+                          <textarea 
+                            value={editNoteValue} 
+                            onChange={(e) => setEditNoteValue(e.target.value)}
+                            className="w-full text-sm p-2 border border-gray-300 rounded focus:ring-[#0D9488] bg-white outline-none"
+                            rows="2"
+                            placeholder="Add notes..."
+                          />
+                          <div className="flex justify-end gap-2">
+                            <button 
+                              onClick={() => { setIsEditingNotes(false); setEditNoteValue(selectedPatient.notes || ''); }} 
+                              className="text-xs font-bold text-gray-500 hover:text-gray-700 py-1 px-2"
+                            >
+                              Cancel
+                            </button>
+                            <button 
+                              onClick={handleSaveNotes} 
+                              className="text-xs font-bold bg-[#0D9488] text-white py-1 px-3 rounded hover:bg-teal-700 shadow-sm"
+                            >
+                              Save
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-gray-700 text-sm font-medium italic">
+                          {selectedPatient.notes ? `"${selectedPatient.notes}"` : "No notes provided."}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>

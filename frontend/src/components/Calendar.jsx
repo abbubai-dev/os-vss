@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react';
 
 export default function Calendar({ selectedDate, setSelectedDate, token, refreshKey }) {
   const [densities, setDensities] = useState([]);
+  
+  // New State for the custom date picker
+  const [customDate, setCustomDate] = useState('');
 
   // Define your holidays here (YYYY-MM-DD). 
-  // The calendar will automatically shift these to the following week (+7 days) 
-  // and continue the 2-week cycle from that new date!
   const HOLIDAY_SHIFTS = [
-    '2026-09-01' // Example: Shift Sept 1st to Sept 8th
+    '2026-09-01' 
   ]; 
 
   const generateUpcomingTuesdays = () => {
@@ -20,12 +21,8 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
       let day = String(currentDate.getDate()).padStart(2, '0');
       let formattedDate = `${year}-${month}-${day}`;
 
-      // HOLIDAY INTERCEPTOR: If the generated date is in our holiday list...
       if (HOLIDAY_SHIFTS.includes(formattedDate)) {
-        // 1. Shift the baseline forward by 7 days
         currentDate.setDate(currentDate.getDate() + 7);
-        
-        // 2. Recalculate the new date strings
         year = currentDate.getFullYear();
         month = String(currentDate.getMonth() + 1).padStart(2, '0');
         day = String(currentDate.getDate()).padStart(2, '0');
@@ -33,8 +30,6 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
       }
       
       dates.push(formattedDate);
-      
-      // Add 14 days for the NEXT iteration in the loop
       currentDate.setDate(currentDate.getDate() + 14); 
     }
     return dates;
@@ -56,31 +51,51 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
     };
     
     if (token) fetchCounts();
-  }, [token, refreshKey]); // Re-run if a new patient is booked/checked-in
+  }, [token, refreshKey]); 
 
   const upcomingDates = generateUpcomingTuesdays();
 
-  // Helper to match database counts with our generated dates
+  // UPDATED: Matches the new SQL query output (data.date and data.count)
   const getCountForDate = (dateStr) => {
-    // Database returns Date objects stringified, so we match the prefix
-    const found = densities.find(d => d.appt_date.startsWith(dateStr));
-    return found ? parseInt(found.total_patients) : 0;
+    const found = densities.find(d => d.date === dateStr);
+    return found ? parseInt(found.count) : 0;
+  };
+
+  // Handler for when the PIC uses the custom date picker
+  const handleCustomDateChange = (e) => {
+    const newDate = e.target.value;
+    if (newDate) {
+      setCustomDate(newDate);
+      setSelectedDate(newDate);
+    }
   };
 
   return (
     <div className="mb-8">
-      <h2 className="text-sm font-bold text-[#1E3A8A] uppercase tracking-wider mb-3">Upcoming Clinic Sessions</h2>
+      <div className="flex justify-between items-center mb-3">
+        <h2 className="text-sm font-bold text-[#1E3A8A] uppercase tracking-wider">Upcoming Specialist Sessions</h2>
+        
+        {/* NEW: Custom Date Picker for the PIC */}
+        <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm">
+          <label className="text-xs font-bold text-gray-500 uppercase">PIC Clinic Date:</label>
+          <input 
+            type="date" 
+            value={customDate || (upcomingDates.includes(selectedDate) ? '' : selectedDate)} 
+            onChange={handleCustomDateChange}
+            className="text-sm font-bold text-[#0D9488] outline-none cursor-pointer bg-transparent"
+          />
+        </div>
+      </div>
+
       <div className="flex gap-4 overflow-x-auto pb-2">
         {upcomingDates.map(dateStr => {
           const count = getCountForDate(dateStr);
           const isSelected = selectedDate === dateStr;
           
-          // Color logic based on busyness
           let badgeColor = "bg-emerald-100 text-emerald-800";
           if (count > 10) badgeColor = "bg-amber-100 text-amber-800";
           if (count > 20) badgeColor = "bg-red-100 text-red-800";
 
-          // Format Date for display
           const displayDate = new Date(dateStr).toLocaleDateString('en-GB', { 
             day: 'numeric', month: 'short', year: 'numeric' 
           });
@@ -88,8 +103,11 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
           return (
             <div 
               key={dateStr}
-              onClick={() => setSelectedDate(dateStr)}
-              className={`min-w-45 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+              onClick={() => {
+                setSelectedDate(dateStr);
+                setCustomDate(''); // Clear custom date when clicking a card
+              }}
+              className={`min-w-45 p-4 rounded-xl border-2 cursor-pointer transition-all shrink-0 ${
                 isSelected 
                   ? 'border-[#0D9488] bg-teal-50 shadow-md transform scale-105' 
                   : 'border-gray-200 bg-white hover:border-[#0D9488] hover:shadow-sm'

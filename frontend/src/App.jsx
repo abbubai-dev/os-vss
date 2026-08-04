@@ -6,6 +6,8 @@ import PatientSearchModal from './components/PatientSearchModal';
 import osvssLogo from './assets/OSVSS-logo.png';
 import CBCTUploader from './components/cbct/CBCTUploader';
 import CBCTViewerButton from './components/cbct/CBCTViewerButton';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 const TIME_SLOTS = [
   '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', 
@@ -282,6 +284,66 @@ function App() {
     }
   };
 
+  const handleGeneratePDF = () => {
+    // 1. Create a new A4 document
+    const doc = new jsPDF();
+    
+    // 2. Format the date nicely (e.g., "Tuesday, 4 August 2026")
+    const dateObj = new Date(selectedDate);
+    const formattedDate = dateObj.toLocaleDateString('en-MY', { 
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+    });
+
+    // 3. Add Header Text
+    doc.setFontSize(16);
+    doc.setTextColor(30, 58, 138); // #1E3A8A (Your Clinic Blue)
+    doc.text('Oral Surgery Clinic - Daily Schedule', 14, 20);
+    
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text(`Hospital Kuala Kangsar | Date: ${formattedDate}`, 14, 28);
+
+    // 4. Define Table Columns and Map Data
+    const tableColumn = ["Time", "Patient Name", "IC Number", "Type", "Treatment", "Doctor's Remarks"];
+    const tableRows = [];
+
+    appointments.forEach(appt => {
+      // Skip deleted or discharged patients if you only want the active queue, 
+      // or just print everyone. (Here we print everyone on the list).
+      const apptData = [
+        appt.appt_time.slice(0, 5),
+        appt.name,
+        appt.ic_number,
+        appt.patient_type,
+        appt.treatment,
+        "" // Leave completely blank for the specialist's handwriting!
+      ];
+      tableRows.push(apptData);
+    });
+
+    // 5. Generate the Table
+    doc.autoTable({
+      startY: 35,
+      head: [tableColumn],
+      body: tableRows,
+      theme: 'grid',
+      headStyles: { fillColor: [30, 58, 138], textColor: 255, fontStyle: 'bold' },
+      styles: { fontSize: 9, cellPadding: 4, textColor: 20 },
+      alternateRowStyles: { fillColor: [248, 250, 252] }, // slate-50
+      columnStyles: {
+        0: { cellWidth: 15, fontStyle: 'bold' }, // Time
+        1: { cellWidth: 40 }, // Name
+        2: { cellWidth: 25 }, // IC
+        3: { cellWidth: 15 }, // Type
+        4: { cellWidth: 25 }, // Treatment
+        5: { cellWidth: 60 }  // Remarks (Extra wide for writing)
+      }
+    });
+
+    // 6. Output: Opens the PDF in a new browser tab for immediate printing
+    window.open(doc.output('bloburl'), '_blank');
+  };
+
   // 5. Reusable Component for Rendering Time Slots
   const renderTimeGrid = () => (
     <div className="grid grid-cols-4 gap-2 mt-2">
@@ -330,6 +392,14 @@ function App() {
             </div>
           </div>
           <div className="flex gap-4 items-center">
+            <button 
+              onClick={handleGeneratePDF} 
+              className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-md shadow-sm border border-slate-300 transition-colors flex items-center gap-2"
+              title="Print Daily Schedule"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+              Print List
+            </button>
             <button 
               onClick={() => setIsSearchModalOpen(true)} 
               className="bg-white hover:bg-gray-50 text-[#1E3A8A] font-bold py-2 px-4 rounded-md shadow-sm border border-gray-200 transition-colors flex items-center gap-2"

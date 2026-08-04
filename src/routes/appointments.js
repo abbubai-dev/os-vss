@@ -1,4 +1,5 @@
 import pool from '../config/db.js';
+import { sendTriageAlert } from '../utils/mailer.js';
 
 // Business Validation Rule: Every 2 weeks on Tuesday
 function verifyOperationalDate(targetDateStr) {
@@ -104,6 +105,22 @@ export async function handleAppointments(req) {
          VALUES ($1, $2, $3, $4, $5, $6, $7, 'Scheduled', $8, $9) RETURNING *`,
         [patient_id, appt_date || null, appt_time || null, treatment, source, patient_type, notes, htpg_consult || 'None', triageStatus]
       );
+
+      // ---> NEW: FIRE AUTOMATED EMAIL IF ROUTED TO TRIAGE <---
+      if (triageStatus === 'Pending Triage') {
+        // Fetch the patient's name for the email
+        const patientRes = await pool.query(`SELECT name FROM patients WHERE id = $1`, [patient_id]);
+        const patientName = patientRes.rows[0]?.name || 'Unknown Patient';
+        
+        // Fire the email asynchronously (don't use 'await' so it doesn't slow down the UI)
+        sendTriageAlert({
+          name: patientName,
+          source: source,
+          treatment: treatment,
+          htpg_consult: htpg_consult || 'None',
+          notes: notes
+        });
+      }
       
       return new Response(JSON.stringify({ success: true, data: result.rows[0] }), { status: 201 });
     } catch (err) {
@@ -242,6 +259,30 @@ export async function handleAppointments(req) {
       
       if (result.rowCount === 0) return new Response(JSON.stringify({ error: 'Not found' }), { status: 404 });
       return new Response(JSON.stringify({ success: true, data: result.rows[0] }), { status: 200 });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+    }
+  }
+
+  // 11. GET /api/appointments/kpi-report (Generate State KPI Data)
+  if (method === 'GET' && url.pathname === '/api/appointments/kpi-report') {
+    const month = url.searchParams.get('month'); // e.g., '08'
+    const year = url.searchParams.get('year');   // e.g., '2026'
+    
+    try {
+      const result = await pool.query(`
+        SELECT htpg_consult as kpi, COUNT(*) as total 
+        FROM appointments 
+        WHERE htpg_consult != 'None'
+          AND (
+            (EXTRACT(MONTH FROM appt_date) = $1 AND EXTRACT(YEAR FROM appt_date) = $2)
+            OR (appt_date IS NULL AND triage_status = 'Pending Triage') 
+          )
+        GROUP BY htpg_consult
+        ORDER BY htpg_consult
+      `, [month, year]);
+      
+      return new Response(JSON.stringify(result.rows), { status: 200 });
     } catch (err) {
       return new Response(JSON.stringify({ error: err.message }), { status: 500 });
     }

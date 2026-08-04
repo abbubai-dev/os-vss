@@ -7,6 +7,7 @@ import osvssLogo from './assets/OSVSS-logo.png';
 import CBCTUploader from './components/cbct/CBCTUploader';
 import CBCTViewerButton from './components/cbct/CBCTViewerButton';
 import TriageInboxModal from './components/TriageInboxModal';
+import KPIReportModal from './components/KPIReportModal';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -56,6 +57,7 @@ function App() {
   // Modals States
   const [isNewApptModalOpen, setIsNewApptModalOpen] = useState(false);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   // Drawer & Patient States
   const [selectedPatient, setSelectedPatient] = useState(null);
@@ -421,6 +423,17 @@ function App() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
               Print List
             </button>
+            {/* KPI Report Button (Hidden for Specialists) */}
+            {userRole !== 'specialist' && (
+              <button 
+                onClick={() => setIsReportModalOpen(true)} 
+                className="bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold py-2 px-4 rounded-md shadow-sm border border-purple-200 transition-colors flex items-center gap-2"
+                title="Generate PKN KPI Report"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                Reports
+              </button>
+            )}
             {/* Triage Inbox Button (Hidden for Specialists) */}
             {userRole !== 'specialist' && (
               <button 
@@ -907,6 +920,12 @@ function App() {
           setIsTriageModalOpen(false);
           setRefreshKey(old => old + 1); // Refreshes the calendar instantly!
         }} 
+      />
+
+      <KPIReportModal 
+        isOpen={isReportModalOpen} 
+        onClose={() => setIsReportModalOpen(false)} 
+        token={token} 
       />
       
     </div>

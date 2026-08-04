@@ -328,15 +328,15 @@ function App() {
       body: tableRows,
       theme: 'grid',
       headStyles: { fillColor: [30, 58, 138], textColor: 255, fontStyle: 'bold' },
-      styles: { fontSize: 8, cellPadding: 2, textColor: 20 },
+      styles: { fontSize: 8, cellPadding: 4, textColor: 20 },
       alternateRowStyles: { fillColor: [248, 250, 252] }, // slate-50
       columnStyles: {
-        0: { cellWidth: 20, fontStyle: 'bold' }, // Time
+        0: { cellWidth: 15, fontStyle: 'bold' }, // Time
         1: { cellWidth: 60 }, // Name
-        2: { cellWidth: 40 }, // IC
+        2: { cellWidth: 35 }, // IC
         3: { cellWidth: 20 }, // Type
-        4: { cellWidth: 20 }, // Treatment
-        5: { cellWidth: 10 }  // Remarks (Extra wide for writing)
+        4: { cellWidth: 15 }, // Treatment
+        5: { cellWidth: 20 }  // Remarks (Extra wide for writing)
       }
     });
 

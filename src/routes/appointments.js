@@ -22,11 +22,14 @@ export async function handleAppointments(req) {
   if (method === 'GET' && url.pathname === '/api/appointments/counts') {
     try {
       const queryText = `
-        SELECT TO_CHAR(appt_date, 'YYYY-MM-DD') as appt_date, COUNT(*) as total_patients 
-        FROM appointments 
-        WHERE status != 'Deleted' 
-        GROUP BY appt_date 
-        ORDER BY appt_date ASC
+        SELECT a.*, p.name, p.ic_number, p.phone_number, p.gender,
+               EXISTS(SELECT 1 FROM attachments att WHERE att.patient_id = p.id) as has_attachments
+        FROM appointments a
+        JOIN patients p ON a.patient_id = p.id
+        WHERE a.appt_date = $1 
+          AND a.status != 'Deleted' 
+          AND a.triage_status != 'Pending Triage' 
+        ORDER BY a.appt_time ASC
       `;
       const result = await pool.query(queryText);
       return new Response(JSON.stringify(result.rows), { status: 200 });
@@ -54,7 +57,9 @@ export async function handleAppointments(req) {
                EXISTS(SELECT 1 FROM attachments att WHERE att.patient_id = p.id) as has_attachments
         FROM appointments a
         JOIN patients p ON a.patient_id = p.id
-        WHERE a.appt_date = $1 AND a.status != 'Deleted'
+        WHERE a.appt_date = $1 
+          AND a.status != 'Deleted' 
+          AND a.triage_status != 'Pending Triage'
         ORDER BY a.appt_time ASC
       `;
       const result = await pool.query(queryText, [dateParam]);
@@ -64,47 +69,49 @@ export async function handleAppointments(req) {
     }
   }
 
-  // 2. POST /api/appointments (Book slot + handle auto-registration of patients)
+  //3. GET /api/appointments/triage (Fetch all unscheduled referrals for the PIC)
+  if (method === 'GET' && url.pathname === '/api/appointments/triage') {
+    try {
+      const result = await pool.query(`
+        SELECT a.*, p.name, p.ic_number, p.phone_number, p.gender,
+               EXISTS(SELECT 1 FROM attachments att WHERE att.patient_id = p.id) as has_attachments
+        FROM appointments a
+        JOIN patients p ON a.patient_id = p.id
+        WHERE a.triage_status = 'Pending Triage' AND a.status != 'Deleted'
+        ORDER BY a.id DESC
+      `);
+      return new Response(JSON.stringify(result.rows), { status: 200 });
+    } catch (err) {
+      console.error(err);
+      return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+    }
+  }
+
+  //4. POST /api/appointments (Create new appointment OR referral)
   if (method === 'POST' && url.pathname === '/api/appointments') {
     try {
-      const body = await req.json();
-      const { name, ic_number, phone_number, gender, appt_date, appt_time, source, treatment, notes } = body;
+      const { 
+        patient_id, appt_date, appt_time, treatment, source, patient_type, notes,
+        htpg_consult // <-- NEW DATA
+      } = await req.json();
 
-      // Validate operational constraints
-     // if (!verifyOperationalDate(appt_date)) {
-     //   return new Response(JSON.stringify({ error: 'Selected date is not a valid bi-weekly Oral Surgery clinic day.' }), { status: 400 });
-     // }
+      // If no date/time is provided, it goes to the Triage Inbox
+      const triageStatus = (appt_date && appt_time) ? 'Scheduled' : 'Pending Triage';
 
-      // Step A: Upsert Patient (Find existing by IC, or create a new profile)
-      let patientRes = await pool.query('SELECT id FROM patients WHERE ic_number = $1', [ic_number]);
-      let patientId;
-      let patientType = 'Baru';
-
-      if (patientRes.rows.length > 0) {
-        patientId = patientRes.rows[0].id;
-        patientType = 'Ulangan'; // Patient already exists in database system
-      } else {
-        const newPatient = await pool.query(
-          'INSERT INTO patients (name, ic_number, phone_number, gender) VALUES ($1, $2, $3, $4) RETURNING id',
-          [name, ic_number, phone_number, gender]
-        );
-        patientId = newPatient.rows[0].id;
-      }
-
-      // Step B: Insert the operational appointment slot
-      const newAppt = await pool.query(
-        `INSERT INTO appointments (patient_id, appt_date, appt_time, source, treatment, patient_type, status, notes)
-         VALUES ($1, $2, $3, $4, $5, $6, 'Scheduled', $7) RETURNING *`,
-        [patientId, appt_date, appt_time, source, treatment, patientType, notes]
+      const result = await pool.query(
+        `INSERT INTO appointments 
+         (patient_id, appt_date, appt_time, treatment, source, patient_type, notes, status, htpg_consult, triage_status) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'Scheduled', $8, $9) RETURNING *`,
+        [patient_id, appt_date || null, appt_time || null, treatment, source, patient_type, notes, htpg_consult || 'None', triageStatus]
       );
-
-      return new Response(JSON.stringify({ success: true, data: newAppt.rows[0] }), { status: 201 });
+      
+      return new Response(JSON.stringify({ success: true, data: result.rows[0] }), { status: 201 });
     } catch (err) {
       return new Response(JSON.stringify({ error: err.message }), { status: 500 });
     }
   }
 
-  // 3. PATCH /api/appointments/:id/checkin (Update status to Checked-In)
+  // 5. PATCH /api/appointments/:id/checkin (Update status to Checked-In)
   if (method === 'PATCH' && url.pathname.match(/^\/api\/appointments\/[^\/]+\/checkin$/)) {
     try {
       const id = url.pathname.split('/')[3];
@@ -119,7 +126,7 @@ export async function handleAppointments(req) {
     }
   }
 
-  // 4. PATCH /api/appointments/:id/checkout (Discharge or set Next Visit)
+  // 6. PATCH /api/appointments/:id/checkout (Discharge or set Next Visit)
   if (method === 'PATCH' && url.pathname.match(/^\/api\/appointments\/[^\/]+\/checkout$/)) {
     try {
       const id = url.pathname.split('/')[3];
@@ -169,7 +176,7 @@ export async function handleAppointments(req) {
     }
   }
   
-  // 5. PATCH /api/appointments/:id/reschedule (Change Date/Time)
+  // 7. PATCH /api/appointments/:id/reschedule (Change Date/Time)
   if (method === 'PATCH' && url.pathname.match(/^\/api\/appointments\/[^\/]+\/reschedule$/)) {
     try {
       const id = url.pathname.split('/')[3];
@@ -187,7 +194,7 @@ export async function handleAppointments(req) {
     }
   }
 
-  // 6. PATCH /api/appointments/:id/delete (Soft Delete)
+  // 8. PATCH /api/appointments/:id/delete (Soft Delete)
   if (method === 'PATCH' && url.pathname.match(/^\/api\/appointments\/[^\/]+\/delete$/)) {
     try {
       const id = url.pathname.split('/')[3];
@@ -202,7 +209,7 @@ export async function handleAppointments(req) {
     }
   }
 
-  // 7. PATCH /api/appointments/:id/notes (Update Initial Notes)
+  // 9. PATCH /api/appointments/:id/notes (Update Initial Notes)
   if (method === 'PATCH' && url.pathname.match(/^\/api\/appointments\/[^\/]+\/notes$/)) {
     try {
       const id = url.pathname.split('/')[3];
@@ -214,6 +221,26 @@ export async function handleAppointments(req) {
       );
       
       if (result.rowCount === 0) return new Response(JSON.stringify({ error: 'Appointment not found' }), { status: 404 });
+      return new Response(JSON.stringify({ success: true, data: result.rows[0] }), { status: 200 });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+    }
+  }
+
+  //10. PATCH /api/appointments/:id/triage-route (PIC assigning date/time and specialist/PIC role)
+  if (method === 'PATCH' && url.pathname.match(/^\/api\/appointments\/[^\/]+\/triage-route$/)) {
+    try {
+      const id = url.pathname.split('/')[3];
+      const { appt_date, appt_time, assigned_to } = await req.json();
+      
+      const result = await pool.query(
+        `UPDATE appointments 
+         SET appt_date = $1, appt_time = $2, assigned_to = $3, triage_status = 'Scheduled'
+         WHERE id = $4 RETURNING *`,
+        [appt_date, appt_time, assigned_to, id]
+      );
+      
+      if (result.rowCount === 0) return new Response(JSON.stringify({ error: 'Not found' }), { status: 404 });
       return new Response(JSON.stringify({ success: true, data: result.rows[0] }), { status: 200 });
     } catch (err) {
       return new Response(JSON.stringify({ error: err.message }), { status: 500 });

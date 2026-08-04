@@ -6,6 +6,7 @@ import PatientSearchModal from './components/PatientSearchModal';
 import osvssLogo from './assets/OSVSS-logo.png';
 import CBCTUploader from './components/cbct/CBCTUploader';
 import CBCTViewerButton from './components/cbct/CBCTViewerButton';
+import TriageInboxModal from './components/TriageInboxModal';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -45,6 +46,7 @@ function App() {
 
   //User role State
   const [userRole] = useState(localStorage.getItem('role'));
+  const [queueFilter, setQueueFilter] = useState('All'); // Options: 'All', 'PIC', 'Specialist'
   
   // Dashboard States
   const [appointments, setAppointments] = useState([]);
@@ -76,6 +78,9 @@ function App() {
   // Notes Editing States
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [editNoteValue, setEditNoteValue] = useState('');
+
+  //Triage modal States
+  const [isTriageModalOpen, setIsTriageModalOpen] = useState(false);
 
   const getAuthHeaders = (json = true) => {
     const headers = { 'Authorization': `Bearer ${token}` };
@@ -335,7 +340,7 @@ function App() {
         1: { cellWidth: 60 }, // Name
         2: { cellWidth: 35 }, // IC
         3: { cellWidth: 20 }, // Type
-        4: { cellWidth: 15 }, // Treatment
+        4: { cellWidth: 20 }, // Treatment
         5: { cellWidth: 20 }  // Remarks (Extra wide for writing)
       }
     });
@@ -371,6 +376,21 @@ function App() {
     </div>
   );
 
+  // --- ROLE-BASED FILTERING LOGIC ---
+  const filteredAppointments = appointments.filter(appt => {
+    // 1. If the logged-in user is a Specialist, force them to only see their own patients
+    if (userRole === 'specialist') {
+      return appt.assigned_to === 'Specialist';
+    }
+    
+    // 2. If it's the PIC/Officer, respect the toggle buttons
+    if (queueFilter === 'PIC') return appt.assigned_to === 'PIC';
+    if (queueFilter === 'Specialist') return appt.assigned_to === 'Specialist';
+    
+    // Default: Show everyone
+    return true; 
+  });
+
   // Authentication Check
   if (!token) return <Login setToken={setToken} />;
 
@@ -392,6 +412,7 @@ function App() {
             </div>
           </div>
           <div className="flex gap-4 items-center">
+            {/* Print Daily Schedule Button */}
             <button 
               onClick={handleGeneratePDF} 
               className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-md shadow-sm border border-slate-300 transition-colors flex items-center gap-2"
@@ -400,6 +421,17 @@ function App() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
               Print List
             </button>
+            {/* Triage Inbox Button (Hidden for Specialists) */}
+            {userRole !== 'specialist' && (
+              <button 
+                onClick={() => setIsTriageModalOpen(true)} 
+                className="bg-red-50 hover:bg-red-100 text-red-700 font-bold py-2 px-4 rounded-md shadow-sm border border-red-200 transition-colors flex items-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
+                Triage Inbox
+              </button>
+            )}
+            {/* Search Patient Button */}
             <button 
               onClick={() => setIsSearchModalOpen(true)} 
               className="bg-white hover:bg-gray-50 text-[#1E3A8A] font-bold py-2 px-4 rounded-md shadow-sm border border-gray-200 transition-colors flex items-center gap-2"
@@ -430,6 +462,30 @@ function App() {
           refreshKey={refreshKey} 
         />
 
+        {/* --- QUEUE TOGGLE BAR (Hidden for Specialists) --- */}
+        {userRole !== 'specialist' && (
+          <div className="flex bg-slate-100 p-1 rounded-lg w-fit mb-4 border border-slate-200">
+            <button 
+              onClick={() => setQueueFilter('All')}
+              className={`px-4 py-1.5 text-sm font-bold rounded-md transition-colors ${queueFilter === 'All' ? 'bg-white text-[#1E3A8A] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              All Patients
+            </button>
+            <button 
+              onClick={() => setQueueFilter('PIC')}
+              className={`px-4 py-1.5 text-sm font-bold rounded-md transition-colors ${queueFilter === 'PIC' ? 'bg-white text-[#0D9488] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              PIC Clinic
+            </button>
+            <button 
+              onClick={() => setQueueFilter('Specialist')}
+              className={`px-4 py-1.5 text-sm font-bold rounded-md transition-colors ${queueFilter === 'Specialist' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Specialist Visit
+            </button>
+          </div>
+        )}
+
         {/* --- QUEUE LEDGER TABLE --- */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <table className="w-full text-left">
@@ -447,14 +503,14 @@ function App() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {appointments.length === 0 ? (
+              {filteredAppointments.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="p-8 text-center text-gray-500 font-medium">
-                    No appointments scheduled for this date.
+                    No patients scheduled for this view.
                   </td>
                 </tr>
               ) : (
-                appointments.map((appt) => (
+                filteredAppointments.map((appt, index) => (
                   <tr 
                     key={appt.id} 
                     onClick={() => openPatientDetails(appt)} 
@@ -477,7 +533,16 @@ function App() {
                         <span className="text-gray-800 font-bold">{appt.name}</span>
                       </div>
                     </td>
-                    <td className="p-4 text-gray-600">{appt.ic_number}</td>
+                    {/* ---> UPDATED: IC Number + Assigned Badge <--- */}
+                    <td className="p-4 text-gray-500 font-medium text-sm flex flex-col items-start gap-1">
+                      {appt.ic_number}
+                      {/* Show the assigned badge ONLY if the user is not a specialist (since specialists already know it's theirs) */}
+                      {userRole !== 'specialist' && appt.assigned_to && appt.assigned_to !== 'Unassigned' && (
+                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${appt.assigned_to === 'Specialist' ? 'bg-purple-100 text-purple-700' : 'bg-teal-100 text-[#0D9488]'}`}>
+                          {appt.assigned_to}
+                        </span>
+                      )}
+                    </td>
                     <td className="p-4 text-gray-600 font-semibold">{appt.source}</td>
                     <td className="p-4 text-gray-600">{appt.treatment}</td>
                     <td className="p-4">
@@ -832,6 +897,16 @@ function App() {
         isOpen={isSearchModalOpen} 
         onClose={() => setIsSearchModalOpen(false)} 
         token={token} 
+      />
+
+      <TriageInboxModal 
+        isOpen={isTriageModalOpen} 
+        onClose={() => setIsTriageModalOpen(false)} 
+        token={token} 
+        onRouteSuccess={() => {
+          setIsTriageModalOpen(false);
+          setRefreshKey(old => old + 1); // Refreshes the calendar instantly!
+        }} 
       />
       
     </div>

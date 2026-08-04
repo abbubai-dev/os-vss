@@ -3,19 +3,25 @@ import { useState, useEffect } from 'react';
 const TIME_SLOTS = ['08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '14:00', '14:30', '15:00', '15:30', '16:00'];
 
 export default function NewAppointmentModal({ isOpen, onClose, token, selectedDate, onSuccess }) {
+  // We keep your awesome single formData state!
   const [formData, setFormData] = useState({
     name: '', ic_number: '', phone_number: '', gender: 'Male',
-    appt_date: selectedDate, appt_time: '', source: 'KPP', treatment: 'MOS', notes: ''
+    appt_date: selectedDate, appt_time: '', source: 'KPP', treatment: 'MOS', notes: '',
+    htpg_consult: 'None' // NEW KPI State
   });
   
+  // NEW Routing State
+  const [isReferral, setIsReferral] = useState(true); // Default to Triage Inbox
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCheckingIC, setIsCheckingIC] = useState(false);
   const [autoFillSuccess, setAutoFillSuccess] = useState(false);
   const [error, setError] = useState('');
   const [bookedSlots, setBookedSlots] = useState([]); 
 
+  // Fetch booked slots ONLY if we are scheduling directly
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || isReferral || !formData.appt_date) return;
     const fetchBookedSlots = async () => {
       try {
         const response = await fetch(`/api/appointments?date=${formData.appt_date}`, {
@@ -28,15 +34,17 @@ export default function NewAppointmentModal({ isOpen, onClose, token, selectedDa
       } catch (err) { console.error(err); }
     };
     fetchBookedSlots();
-  }, [formData.appt_date, isOpen, token]);
+  }, [formData.appt_date, isOpen, isReferral, token]);
 
-  // NEW: Reset form every time the modal opens
+  // Reset form every time the modal opens
   useEffect(() => {
     if (isOpen) {
       setFormData({
         name: '', ic_number: '', phone_number: '', gender: 'Male',
-        appt_date: selectedDate, appt_time: '', source: 'KPP', treatment: 'MOS', notes: ''
+        appt_date: selectedDate, appt_time: '', source: 'KPP', treatment: 'MOS', notes: '',
+        htpg_consult: 'None'
       });
+      setIsReferral(true); // Reset to Triage by default
       setError('');
       setAutoFillSuccess(false);
     }
@@ -47,15 +55,15 @@ export default function NewAppointmentModal({ isOpen, onClose, token, selectedDa
   const handleChange = (e) => {
     let { name, value } = e.target;
     
-    // 1. Auto-Capitalize Name
+    // Auto-Capitalize Name
     if (name === 'name') value = value.toUpperCase();
     
     setFormData(prev => {
       const updatedData = { ...prev, [name]: value };
       
-      // 2. Auto-Detect Gender from Malaysian IC (Last digit: Odd=Male, Even=Female)
+      // Auto-Detect Gender from Malaysian IC
       if (name === 'ic_number') {
-        const cleanIC = value.replace(/\D/g, ''); // Strip any hyphens
+        const cleanIC = value.replace(/\D/g, ''); 
         if (cleanIC.length === 12) {
           const lastDigit = parseInt(cleanIC.substring(11, 12));
           updatedData.gender = (lastDigit % 2 === 0) ? 'Female' : 'Male';
@@ -65,7 +73,7 @@ export default function NewAppointmentModal({ isOpen, onClose, token, selectedDa
     });
   };
 
-  // NEW: Check IC and auto-fill data
+  // Check IC and auto-fill data
   const handleICBlur = async () => {
     const ic = formData.ic_number.trim();
     if (!ic) return;
@@ -87,7 +95,6 @@ export default function NewAppointmentModal({ isOpen, onClose, token, selectedDa
             gender: data.patient.gender
           }));
           setAutoFillSuccess(true);
-          // Hide success message after 3 seconds
           setTimeout(() => setAutoFillSuccess(false), 3000);
         }
       }
@@ -100,16 +107,25 @@ export default function NewAppointmentModal({ isOpen, onClose, token, selectedDa
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.appt_time) return setError("Please select a valid time slot.");
+    // Only require a time slot if they are booking directly
+    if (!isReferral && !formData.appt_time) return setError("Please select a valid time slot.");
     
     setIsSubmitting(true);
     setError('');
+
+    // Prepare payload, nullifying date/time if it's going to the Triage Inbox
+    const payload = {
+      ...formData,
+      appt_date: isReferral ? null : formData.appt_date,
+      appt_time: isReferral ? null : formData.appt_time,
+      patient_type: 'Baru' // Defaulted safely
+    };
 
     try {
       const response = await fetch('/api/appointments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       });
       if (response.ok) {
         onSuccess(); 
@@ -131,7 +147,7 @@ export default function NewAppointmentModal({ isOpen, onClose, token, selectedDa
         <div className="p-6 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
           <div>
             <h2 className="text-xl font-extrabold text-[#1E3A8A]">Register New Patient</h2>
-            <p className="text-sm text-gray-500 font-medium">Add to Clinic Queue</p>
+            <p className="text-sm text-gray-500 font-medium">Add to Clinic Queue or Triage Inbox</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-red-500 text-3xl font-bold leading-none">&times;</button>
         </div>
@@ -139,6 +155,7 @@ export default function NewAppointmentModal({ isOpen, onClose, token, selectedDa
         <form onSubmit={handleSubmit} className="p-6">
           {error && <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-md text-sm text-red-700 font-bold">{error}</div>}
 
+          {/* 1. PATIENT BIODATA (Your awesome original code) */}
           <div className="flex justify-between items-end mb-4 border-b pb-2">
              <h3 className="text-xs uppercase text-[#0D9488] font-extrabold tracking-wider">Patient Biodata</h3>
              {isCheckingIC && <span className="text-[10px] text-gray-400 font-bold uppercase animate-pulse">Checking records...</span>}
@@ -149,12 +166,8 @@ export default function NewAppointmentModal({ isOpen, onClose, token, selectedDa
             <div className="col-span-2">
               <label className="block text-xs font-bold text-gray-700 mb-1">IC Number <span className="text-gray-400 font-normal ml-1">(Type first to auto-fill)</span></label>
               <input 
-                type="text" 
-                name="ic_number" 
-                required 
-                value={formData.ic_number} 
-                onChange={handleChange} 
-                onBlur={handleICBlur} // <-- Triggers lookup when clicking away
+                type="text" name="ic_number" required value={formData.ic_number} 
+                onChange={handleChange} onBlur={handleICBlur} 
                 className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-[#0D9488]" 
               />
             </div>
@@ -176,14 +189,58 @@ export default function NewAppointmentModal({ isOpen, onClose, token, selectedDa
           </div>
 
           <h3 className="text-xs uppercase text-[#0D9488] font-extrabold tracking-wider mb-4 border-b pb-2">Clinical Details</h3>
+          
+          {/* 2. ROUTING TOGGLE (NEW) */}
+          <div className="mb-6 p-4 border rounded-lg bg-slate-50 border-slate-200">
+            <label className="block text-sm font-bold text-gray-700 mb-3">Routing Method</label>
+            <div className="flex gap-6">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="routing" checked={isReferral} onChange={() => setIsReferral(true)} className="accent-[#0D9488] w-4 h-4" />
+                <span className="text-sm font-bold text-slate-800">Send to Triage Inbox</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="routing" checked={!isReferral} onChange={() => setIsReferral(false)} className="accent-[#0D9488] w-4 h-4" />
+                <span className="text-sm font-bold text-slate-800">Schedule Directly</span>
+              </label>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-4 mb-6">
             
-            <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Target Date</label>
-              <input type="date" name="appt_date" required value={formData.appt_date} onChange={handleChange} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-[#0D9488]" />
-            </div>
+            {/* 3. CONDITIONAL DATE & TIME SLOTS (Your awesome grid returns here!) */}
+            {!isReferral && (
+              <>
+                <div className="col-span-2">
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Target Date</label>
+                  <input type="date" name="appt_date" required={!isReferral} value={formData.appt_date} onChange={handleChange} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-[#0D9488]" />
+                </div>
+                
+                <div className="col-span-2 bg-slate-50 p-4 rounded-lg border border-slate-200 mt-2 mb-2">
+                  <label className="block text-xs font-bold text-gray-700 mb-2">Select Available Time Slot</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {TIME_SLOTS.map(slot => {
+                      const isBooked = bookedSlots.includes(slot);
+                      const isSelected = formData.appt_time === slot;
+                      return (
+                        <button
+                          type="button" key={slot} disabled={isBooked}
+                          onClick={() => setFormData({ ...formData, appt_time: slot })}
+                          className={`py-2 px-1 text-xs font-bold rounded border transition-colors ${
+                            isBooked ? 'bg-red-50 text-red-400 border-red-200 cursor-not-allowed' :
+                            isSelected ? 'bg-[#1E3A8A] text-white border-[#1E3A8A] shadow-md' :
+                            'bg-white text-gray-700 border-gray-300 hover:border-[#0D9488] hover:text-[#0D9488]'
+                          }`}
+                        >
+                          {isBooked ? 'Full' : slot}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
 
-            {/* ---> NEW: Referral Source <--- */}
+            {/* 4. SOURCE & TREATMENT */}
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1">Referral Source</label>
               <select name="source" value={formData.source} onChange={handleChange} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-[#0D9488] bg-white">
@@ -193,7 +250,7 @@ export default function NewAppointmentModal({ isOpen, onClose, token, selectedDa
                 <option value="KPSS">KPSS</option>
                 <option value="KPKK">KPKK</option>
                 <option value="ED">ED (Oncall)</option>
-                <option value="Hosp. Taiping">Hosp.Taiping</option>
+                <option value="Hosp. Taiping">Hosp. Taiping</option>
                 <option value="Others">Others</option>
               </select>
             </div>
@@ -208,27 +265,19 @@ export default function NewAppointmentModal({ isOpen, onClose, token, selectedDa
               </select>
             </div>
             
-            <div className="col-span-2 bg-slate-50 p-4 rounded-lg border border-slate-200 mt-2">
-              <label className="block text-xs font-bold text-gray-700 mb-2">Select Available Time Slot</label>
-              <div className="grid grid-cols-4 gap-2">
-                {TIME_SLOTS.map(slot => {
-                  const isBooked = bookedSlots.includes(slot);
-                  const isSelected = formData.appt_time === slot;
-                  return (
-                    <button
-                      type="button" key={slot} disabled={isBooked}
-                      onClick={() => setFormData({ ...formData, appt_time: slot })}
-                      className={`py-2 px-1 text-xs font-bold rounded border transition-colors ${
-                        isBooked ? 'bg-red-50 text-red-400 border-red-200 cursor-not-allowed' :
-                        isSelected ? 'bg-[#1E3A8A] text-white border-[#1E3A8A] shadow-md' :
-                        'bg-white text-gray-700 border-gray-300 hover:border-[#0D9488] hover:text-[#0D9488]'
-                      }`}
-                    >
-                      {isBooked ? 'Full' : slot}
-                    </button>
-                  )
-                })}
-              </div>
+            {/* 5. HTPG KPI (NEW) */}
+            <div className="col-span-2 p-3 bg-purple-50 border border-purple-100 rounded-lg mt-2">
+              <label className="block text-xs font-bold text-purple-900 mb-1">State KPI Tracking (HTPG Consults)</label>
+              <select 
+                name="htpg_consult" value={formData.htpg_consult} onChange={handleChange} 
+                className="w-full border border-purple-200 rounded-md p-2 text-sm focus:ring-purple-500 bg-white text-purple-900"
+              >
+                <option value="None">No HTPG Consult (Standard Workflow)</option>
+                <option value="KPI 1: Defer to Specialist Visit">KPI 1: Defer to Specialist Visit (Managed Locally)</option>
+                <option value="KPI 2: Cluster PIC Assessment">KPI 2: Cluster PIC Assessment (Temp Measure)</option>
+                <option value="KPI 3: Cluster Admission">KPI 3: Cluster Admission (Reviewed by PIC)</option>
+                <option value="KPI 4: Stabilize & Transfer">KPI 4: Stabilize locally & Transfer to HTPG</option>
+              </select>
             </div>
 
             <div className="col-span-2">
@@ -240,7 +289,7 @@ export default function NewAppointmentModal({ isOpen, onClose, token, selectedDa
           <div className="flex gap-4 mt-8">
             <button type="button" onClick={onClose} className="w-1/3 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-3 px-4 rounded-lg">Cancel</button>
             <button type="submit" disabled={isSubmitting} className="w-2/3 bg-[#1E3A8A] hover:bg-blue-900 text-white font-bold py-3 px-4 rounded-lg shadow-md disabled:bg-gray-400">
-              {isSubmitting ? 'Registering...' : 'Register & Schedule Visit'}
+              {isSubmitting ? 'Saving...' : (isReferral ? 'Submit to Triage Inbox' : 'Register & Schedule Visit')}
             </button>
           </div>
         </form>

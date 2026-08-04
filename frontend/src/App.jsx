@@ -7,7 +7,7 @@ import osvssLogo from './assets/OSVSS-logo.png';
 import CBCTUploader from './components/cbct/CBCTUploader';
 import CBCTViewerButton from './components/cbct/CBCTViewerButton';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 const TIME_SLOTS = [
   '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', 
@@ -322,7 +322,7 @@ function App() {
     });
 
     // 5. Generate the Table
-    doc.autoTable({
+    autoTable(doc, {       // <-- Use it as a function and pass 'doc' inside
       startY: 35,
       head: [tableColumn],
       body: tableRows,

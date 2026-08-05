@@ -46,12 +46,13 @@ function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
 
   //User role State
-  const [userRole] = useState(localStorage.getItem('role'));
+  const [userRole, setUserRole] = useState(localStorage.getItem('role')); // <-- Make sure ", setUserRole" is inside the brackets!
+  const [queueFilter, setQueueFilter] = useState('All'); 
+  
   // NEW: Instantly sync the role whenever the token changes (Login/Logout)
   useEffect(() => {
     setUserRole(localStorage.getItem('role'));
   }, [token]);
-  const [queueFilter, setQueueFilter] = useState('All'); // Options: 'All', 'PIC', 'Specialist'
   
   // Dashboard States
   const [appointments, setAppointments] = useState([]);

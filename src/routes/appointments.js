@@ -89,9 +89,26 @@ export async function handleAppointments(req) {
   if (method === 'POST' && url.pathname === '/api/appointments') {
     try {
       const { 
-        patient_id, appt_date, appt_time, treatment, source, patient_type, notes,
-        htpg_consult // <-- NEW DATA
+        name, ic_number, phone_number, gender, // <-- NEW: Now capturing the patient's biodata!
+        appt_date, appt_time, treatment, source, patient_type, notes,
+        htpg_consult 
       } = await req.json();
+
+      // ---> NEW: FIND OR CREATE PATIENT FIRST <---
+      let final_patient_id;
+      const existingPatient = await pool.query('SELECT id FROM patients WHERE ic_number = $1', [ic_number]);
+      
+      if (existingPatient.rowCount > 0) {
+        // Patient exists, use their ID
+        final_patient_id = existingPatient.rows[0].id;
+      } else {
+        // New patient! Create them in the database and grab their new ID
+        const newPatient = await pool.query(
+          'INSERT INTO patients (name, ic_number, phone_number, gender) VALUES ($1, $2, $3, $4) RETURNING id',
+          [name, ic_number, phone_number, gender]
+        );
+        final_patient_id = newPatient.rows[0].id;
+      }
 
       // If no date/time is provided, it goes to the Triage Inbox
       const triageStatus = (appt_date && appt_time) ? 'Scheduled' : 'Pending Triage';
@@ -100,18 +117,14 @@ export async function handleAppointments(req) {
         `INSERT INTO appointments 
          (patient_id, appt_date, appt_time, treatment, source, patient_type, notes, status, htpg_consult, triage_status) 
          VALUES ($1, $2, $3, $4, $5, $6, $7, 'Scheduled', $8, $9) RETURNING *`,
-        [patient_id, appt_date || null, appt_time || null, treatment, source, patient_type, notes, htpg_consult || 'None', triageStatus]
+        [final_patient_id, appt_date || null, appt_time || null, treatment, source, patient_type, notes, htpg_consult || 'None', triageStatus]
       );
 
-      // ---> NEW: FIRE AUTOMATED EMAIL IF ROUTED TO TRIAGE <---
+      // ---> UPDATED: FIRE AUTOMATED EMAIL IF ROUTED TO TRIAGE <---
       if (triageStatus === 'Pending Triage') {
-        // Fetch the patient's name for the email
-        const patientRes = await pool.query(`SELECT name FROM patients WHERE id = $1`, [patient_id]);
-        const patientName = patientRes.rows[0]?.name || 'Unknown Patient';
-        
-        // Fire the email asynchronously (don't use 'await' so it doesn't slow down the UI)
+        // We can now just use the 'name' variable directly from the frontend payload!
         sendTriageAlert({
-          name: patientName,
+          name: name || 'Unknown Patient',
           source: source,
           treatment: treatment,
           htpg_consult: htpg_consult || 'None',

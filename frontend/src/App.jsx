@@ -8,6 +8,7 @@ import CBCTUploader from './components/cbct/CBCTUploader';
 import CBCTViewerButton from './components/cbct/CBCTViewerButton';
 import TriageInboxModal from './components/TriageInboxModal';
 import KPIReportModal from './components/KPIReportModal';
+import MOUploader from './components/MOUploader';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -488,17 +489,28 @@ function App() {
 
         {/* --- DISTRICT MO VIEW: REFERRAL PORTAL ONLY --- */}
         {userRole === 'mo' ? (
-          <div className="bg-white p-12 rounded-xl shadow-sm border border-gray-200 text-center mt-10">
-            <h2 className="text-3xl font-extrabold text-[#1E3A8A] mb-4">Welcome to the Referral Portal</h2>
-            <p className="text-gray-500 font-medium mb-8 max-w-lg mx-auto">
-              Submit new urgent referrals and KPI cases directly to the Hospital Kuala Kangsar Oral Surgery Cluster for triage and assessment.
-            </p>
-            <button 
-              onClick={() => setIsNewApptModalOpen(true)} 
-              className="bg-[#0D9488] hover:bg-teal-700 text-white font-bold py-4 px-8 rounded-lg shadow-md transition-colors text-lg inline-flex items-center gap-3"
-            >
-              <span className="text-2xl leading-none">+</span> Submit New Referral
-            </button>
+          <div className="max-w-5xl mx-auto mt-10 grid grid-cols-1 md:grid-cols-2 gap-8">
+            
+            {/* Left Column: Step 1 Referral Form */}
+            <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200 text-center flex flex-col justify-center h-full">
+              <div className="w-16 h-16 bg-teal-50 text-[#0D9488] rounded-full flex items-center justify-center mx-auto mb-6">
+                 <span className="text-2xl font-bold">1</span>
+              </div>
+              <h2 className="text-2xl font-extrabold text-[#1E3A8A] mb-2">New Referral</h2>
+              <p className="text-gray-500 font-medium mb-8 text-sm">
+                Submit urgent referrals directly to the Hospital Kuala Kangsar Oral Surgery Triage Inbox.
+              </p>
+              <button 
+                onClick={() => setIsNewApptModalOpen(true)} 
+                className="bg-[#0D9488] hover:bg-teal-700 text-white font-bold py-4 px-8 rounded-lg shadow-md transition-colors text-lg inline-flex items-center justify-center gap-3 w-full"
+              >
+                <span className="text-2xl leading-none">+</span> Submit New Referral
+              </button>
+            </div>
+
+            {/* Right Column: Step 2 Document Uploader */}
+            <MOUploader token={token} />
+            
           </div>
         ) : (
           /* --- ADMIN / PIC / SPECIALIST VIEW: FULL DASHBOARD --- */

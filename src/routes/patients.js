@@ -11,7 +11,7 @@ export async function handlePatients(req) {
 
     try {
       const result = await pool.query(
-        `SELECT name, phone_number, gender FROM patients WHERE ic_number = $1`,
+        `SELECT id, name, phone_number, gender FROM patients WHERE ic_number = $1`,
         [ic]
       );
       if (result.rowCount > 0) {

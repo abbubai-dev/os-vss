@@ -29,6 +29,7 @@ export async function handleAuth(req) {
       const { username, password } = body;
 
       const users = getValidUsers();
+      console.log("LOADED USERS FROM ENV:", users); // <--- ADD THIS LINE
       const validUser = users.find(u => u.username === username && u.password === password);
 
       if (!validUser) {

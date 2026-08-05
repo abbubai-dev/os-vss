@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import osvssLogo from '../assets/OSVSS-logo.png';
 
-export default function Login({ setToken }) {
+// 1. ---> ADD setUserRole HERE <---
+export default function Login({ setToken, setUserRole }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -25,6 +26,10 @@ export default function Login({ setToken }) {
         // Save the secure token to the browser's local storage
         localStorage.setItem('token', data.token);
         localStorage.setItem('role', data.role);
+        
+        // 2. ---> ADD THIS LINE TO INSTANTLY UPDATE THE DASHBOARD <---
+        setUserRole(data.role); 
+        
         setToken(data.token); // Unlock the main app
       } else {
         setError(data.error || 'Invalid credentials.');

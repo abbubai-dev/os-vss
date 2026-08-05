@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 
 const TIME_SLOTS = ['08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '14:00', '14:30', '15:00', '15:30', '16:00'];
 
-export default function NewAppointmentModal({ isOpen, onClose, token, selectedDate, onSuccess }) {
+export default function NewAppointmentModal({ isOpen, onClose, token, selectedDate, onSuccess, userRole }) {
   // We keep your awesome single formData state!
   const [formData, setFormData] = useState({
     name: '', ic_number: '', phone_number: '', gender: 'Male',
@@ -190,20 +190,22 @@ export default function NewAppointmentModal({ isOpen, onClose, token, selectedDa
 
           <h3 className="text-xs uppercase text-[#0D9488] font-extrabold tracking-wider mb-4 border-b pb-2">Clinical Details</h3>
           
-          {/* 2. ROUTING TOGGLE (NEW) */}
-          <div className="mb-6 p-4 border rounded-lg bg-slate-50 border-slate-200">
-            <label className="block text-sm font-bold text-gray-700 mb-3">Routing Method</label>
-            <div className="flex gap-6">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="routing" checked={isReferral} onChange={() => setIsReferral(true)} className="accent-[#0D9488] w-4 h-4" />
-                <span className="text-sm font-bold text-slate-800">Send to Triage Inbox</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="routing" checked={!isReferral} onChange={() => setIsReferral(false)} className="accent-[#0D9488] w-4 h-4" />
-                <span className="text-sm font-bold text-slate-800">Schedule Directly</span>
-              </label>
+          {/* 2. ROUTING TOGGLE (Hidden for District MOs - Forced to Triage) */}
+          {userRole !== 'mo' && (
+            <div className="mb-6 p-4 border rounded-lg bg-slate-50 border-slate-200">
+              <label className="block text-sm font-bold text-gray-700 mb-3">Routing Method</label>
+              <div className="flex gap-6">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="routing" checked={isReferral} onChange={() => setIsReferral(true)} className="accent-[#0D9488] w-4 h-4" />
+                  <span className="text-sm font-bold text-slate-800">Send to Triage Inbox</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="routing" checked={!isReferral} onChange={() => setIsReferral(false)} className="accent-[#0D9488] w-4 h-4" />
+                  <span className="text-sm font-bold text-slate-800">Schedule Directly</span>
+                </label>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4 mb-6">
             

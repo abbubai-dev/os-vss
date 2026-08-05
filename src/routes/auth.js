@@ -3,7 +3,8 @@ import jwt from 'jsonwebtoken';
 // Helper function to extract credentials from .env
 function getValidUsers() {
   const users = [];
-  const envRoles = ['ADMIN_CREDS', 'ASSISTANT_CREDS', 'SPECIALIST_CREDS'];
+  // ---> NEW: Added 'MO_CREDS' to the array <---
+  const envRoles = ['ADMIN_CREDS', 'ASSISTANT_CREDS', 'SPECIALIST_CREDS', 'MO_CREDS'];
   
   envRoles.forEach(envKey => {
     if (process.env[envKey]) {
@@ -11,7 +12,7 @@ function getValidUsers() {
       users.push({ 
         username, 
         password, 
-        role: envKey.split('_')[0].toLowerCase() // e.g., 'admin', 'assistant'
+        role: envKey.split('_')[0].toLowerCase() // e.g., 'admin', 'assistant', 'mo'
       });
     }
   });

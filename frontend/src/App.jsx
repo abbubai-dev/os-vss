@@ -466,6 +466,23 @@ function App() {
             </button>
           </div>
         </header>
+        {/* --- DISTRICT MO VIEW: REFERRAL PORTAL ONLY --- */}
+        {userRole === 'mo' ? (
+          <div className="bg-white p-12 rounded-xl shadow-sm border border-gray-200 text-center mt-10">
+            <h2 className="text-3xl font-extrabold text-[#1E3A8A] mb-4">Welcome to the Referral Portal</h2>
+            <p className="text-gray-500 font-medium mb-8 max-w-lg mx-auto">
+              Submit new urgent referrals and KPI cases directly to the Hospital Kuala Kangsar Oral Surgery Cluster for triage and assessment.
+            </p>
+            <button 
+              onClick={() => setIsNewApptModalOpen(true)} 
+              className="bg-[#0D9488] hover:bg-teal-700 text-white font-bold py-4 px-8 rounded-lg shadow-md transition-colors text-lg inline-flex items-center gap-3"
+            >
+              <span className="text-2xl leading-none">+</span> Submit New Referral
+            </button>
+          </div>
+        ) : (
+          /* --- ADMIN / PIC / SPECIALIST VIEW: FULL DASHBOARD --- */
+          <>
 
         {/* --- CALENDAR COMPONENT --- */}
         <Calendar 
@@ -590,6 +607,8 @@ function App() {
             </tbody>
           </table>
         </div>
+        </>
+        )}
       </div>
 
       {/* --- SLIDING DRAWER BACKGROUND OVERLAY --- */}
@@ -904,6 +923,7 @@ function App() {
         token={token} 
         selectedDate={selectedDate} 
         onSuccess={() => setRefreshKey(old => old + 1)} 
+        userRole={userRole} 
       />
       
       <PatientSearchModal 

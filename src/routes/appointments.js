@@ -22,17 +22,14 @@ export async function handleAppointments(req) {
   // 1. GET /api/appointments/counts (Fetch patient density per day)
   if (method === 'GET' && url.pathname === '/api/appointments/counts') {
     try {
-      const queryText = `
-        SELECT a.*, p.name, p.ic_number, p.phone_number, p.gender,
-               EXISTS(SELECT 1 FROM attachments att WHERE att.patient_id = p.id) as has_attachments
-        FROM appointments a
-        JOIN patients p ON a.patient_id = p.id
-        WHERE a.appt_date = $1 
-          AND a.status != 'Deleted' 
-          AND a.triage_status != 'Pending Triage' 
-        ORDER BY a.appt_time ASC
-      `;
-      const result = await pool.query(queryText);
+      const result = await pool.query(`
+        SELECT appt_date as date, COUNT(*) as count 
+        FROM appointments 
+        WHERE status != 'Deleted' 
+          AND triage_status != 'Pending Triage' 
+          AND appt_date IS NOT NULL
+        GROUP BY appt_date
+      `);
       return new Response(JSON.stringify(result.rows), { status: 200 });
     } catch (err) {
       return new Response(JSON.stringify({ error: err.message }), { status: 500 });

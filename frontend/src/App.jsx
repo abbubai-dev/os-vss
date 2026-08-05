@@ -413,51 +413,64 @@ function App() {
               <p className="text-gray-500 font-medium">Hospital Kuala Kangsar</p>
             </div>
           </div>
+          
           <div className="flex gap-4 items-center">
-            {/* Print Daily Schedule Button */}
-            <button 
-              onClick={handleGeneratePDF} 
-              className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-md shadow-sm border border-slate-300 transition-colors flex items-center gap-2"
-              title="Print Daily Schedule"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-              Print List
-            </button>
-            {/* KPI Report Button (Hidden for Specialists) */}
-            {userRole !== 'specialist' && (
-              <button 
-                onClick={() => setIsReportModalOpen(true)} 
-                className="bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold py-2 px-4 rounded-md shadow-sm border border-purple-200 transition-colors flex items-center gap-2"
-                title="Generate PKN KPI Report"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                Reports
-              </button>
+            {/* ---> ONLY SHOW THESE BUTTONS IF NOT AN MO <--- */}
+            {userRole !== 'mo' && (
+              <>
+                {/* Print Daily Schedule Button */}
+                <button 
+                  onClick={handleGeneratePDF} 
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-4 rounded-md shadow-sm border border-slate-300 transition-colors flex items-center gap-2"
+                  title="Print Daily Schedule"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                  Print List
+                </button>
+                
+                {/* KPI Report Button (Hidden for Specialists) */}
+                {userRole !== 'specialist' && (
+                  <button 
+                    onClick={() => setIsReportModalOpen(true)} 
+                    className="bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold py-2 px-4 rounded-md shadow-sm border border-purple-200 transition-colors flex items-center gap-2"
+                    title="Generate PKN KPI Report"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    Reports
+                  </button>
+                )}
+                
+                {/* Triage Inbox Button (Hidden for Specialists) */}
+                {userRole !== 'specialist' && (
+                  <button 
+                    onClick={() => setIsTriageModalOpen(true)} 
+                    className="bg-red-50 hover:bg-red-100 text-red-700 font-bold py-2 px-4 rounded-md shadow-sm border border-red-200 transition-colors flex items-center gap-2"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
+                    Triage Inbox
+                  </button>
+                )}
+                
+                {/* Search Patient Button */}
+                <button 
+                  onClick={() => setIsSearchModalOpen(true)} 
+                  className="bg-white hover:bg-gray-50 text-[#1E3A8A] font-bold py-2 px-4 rounded-md shadow-sm border border-gray-200 transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                  Search
+                </button>
+                
+                {/* New Patient Button */}
+                <button 
+                  onClick={() => setIsNewApptModalOpen(true)} 
+                  className="bg-[#0D9488] hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-md shadow-sm transition-colors flex items-center gap-2"
+                >
+                  <span className="text-lg leading-none">+</span> New Patient
+                </button>
+              </>
             )}
-            {/* Triage Inbox Button (Hidden for Specialists) */}
-            {userRole !== 'specialist' && (
-              <button 
-                onClick={() => setIsTriageModalOpen(true)} 
-                className="bg-red-50 hover:bg-red-100 text-red-700 font-bold py-2 px-4 rounded-md shadow-sm border border-red-200 transition-colors flex items-center gap-2"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
-                Triage Inbox
-              </button>
-            )}
-            {/* Search Patient Button */}
-            <button 
-              onClick={() => setIsSearchModalOpen(true)} 
-              className="bg-white hover:bg-gray-50 text-[#1E3A8A] font-bold py-2 px-4 rounded-md shadow-sm border border-gray-200 transition-colors flex items-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-              Search
-            </button>
-            <button 
-              onClick={() => setIsNewApptModalOpen(true)} 
-              className="bg-[#0D9488] hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-md shadow-sm transition-colors flex items-center gap-2"
-            >
-              <span className="text-lg leading-none">+</span> New Patient
-            </button>
+
+            {/* Logout Button (Everyone sees this) */}
             <button 
               onClick={handleLogout} 
               className="text-gray-500 hover:text-red-600 font-semibold px-3 py-2 transition-colors border border-transparent hover:border-red-200 rounded-md hover:bg-red-50"
@@ -466,6 +479,7 @@ function App() {
             </button>
           </div>
         </header>
+
         {/* --- DISTRICT MO VIEW: REFERRAL PORTAL ONLY --- */}
         {userRole === 'mo' ? (
           <div className="bg-white p-12 rounded-xl shadow-sm border border-gray-200 text-center mt-10">

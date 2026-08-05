@@ -258,7 +258,7 @@ export default function NewAppointmentModal({ isOpen, onClose, token, selectedDa
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Treatment</label>
+              <label className="block text-xs font-bold text-gray-700 mb-1">Management</label>
               <select name="treatment" value={formData.treatment} onChange={handleChange} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-[#0D9488] bg-white">
                 <option value="MOS">MOS</option>
                 <option value="Review">Review</option>

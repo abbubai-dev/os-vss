@@ -545,7 +545,7 @@ function App() {
                 <th className="p-4 font-bold">Patient Name</th>
                 <th className="p-4 font-bold">IC Number</th>
                 <th className="p-4 font-bold">Source</th>
-                <th className="p-4 font-bold">Treatment</th>
+                <th className="p-4 font-bold">Managemnet</th>
                 <th className="p-4 font-bold">Type</th>
                 <th className="p-4 font-bold">Status</th>
                 {/* NEW ACTION HEADER */}
@@ -669,7 +669,7 @@ function App() {
                     <p className="font-extrabold text-[#1E3A8A]">{selectedPatient.source}</p>
                   </div>
                   <div>
-                    <p className="text-gray-500 font-bold text-[10px] uppercase tracking-wider">Treatment</p>
+                    <p className="text-gray-500 font-bold text-[10px] uppercase tracking-wider">Management</p>
                     <p className="font-extrabold text-[#1E3A8A]">{selectedPatient.treatment}</p>
                   </div>
                   <div className="col-span-2 mt-2 pt-3 border-t border-gray-100">

@@ -47,6 +47,10 @@ function App() {
 
   //User role State
   const [userRole] = useState(localStorage.getItem('role'));
+  // NEW: Instantly sync the role whenever the token changes (Login/Logout)
+  useEffect(() => {
+    setUserRole(localStorage.getItem('role'));
+  }, [token]);
   const [queueFilter, setQueueFilter] = useState('All'); // Options: 'All', 'PIC', 'Specialist'
   
   // Dashboard States
@@ -94,6 +98,7 @@ function App() {
     localStorage.removeItem('token');
     localStorage.removeItem('role');
     setToken(null);
+    setUserRole(null);
   };
 
   // 1. Fetch Main Queue

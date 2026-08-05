@@ -400,7 +400,7 @@ function App() {
   });
 
   // Authentication Check
-  if (!token) return <Login setToken={setToken} />;
+  if (!token) return <Login setToken={setToken} setUserRole={setUserRole} />;
 
   return (
     <div className="min-h-screen bg-slate-50 p-8 relative font-sans">

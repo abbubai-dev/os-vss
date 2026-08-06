@@ -37,7 +37,7 @@ export async function handleAppointments(req) {
   }
 
   // 2. GET /api/appointments?date=YYYY-MM-DD
-  if (method === 'GET' && url.pathname.startsWith('/api/appointments') && !url.pathname.includes('/counts')) {
+  if (method === 'GET' && url.pathname === '/api/appointments') {
     const dateParam = url.searchParams.get('date');
     if (!dateParam) return new Response(JSON.stringify({ error: 'Date is required' }), { status: 400 });
 

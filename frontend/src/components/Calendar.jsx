@@ -55,9 +55,20 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
 
   const upcomingDates = generateUpcomingTuesdays();
 
-  // UPDATED: Matches the new SQL query output (data.date and data.count)
+  // UPDATED: Smart Date Matcher (Handles timezones and Postgres timestamps)
   const getCountForDate = (dateStr) => {
-    const found = densities.find(d => d.date === dateStr);
+    const found = densities.find(d => {
+      // 1. Direct match (if the backend already formatted it perfectly)
+      if (d.date === dateStr) return true;
+      
+      // 2. Safely parse the backend date into a standard YYYY-MM-DD string
+      const dateObj = new Date(d.date);
+      const localDateStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+      
+      // 3. Match against the clean date or a simple substring
+      return localDateStr === dateStr || String(d.date).substring(0, 10) === dateStr;
+    });
+    
     return found ? parseInt(found.count) : 0;
   };
 

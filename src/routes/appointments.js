@@ -113,6 +113,9 @@ export async function handleAppointments(req) {
       // If no date/time is provided, it goes to the Triage Inbox
       const triageStatus = (appt_date && appt_time) ? 'Scheduled' : 'Pending Triage';
 
+      // ---> NEW: Automatically assign to Specialist if scheduled directly <---
+      const defaultAssignee = (appt_date && appt_time) ? 'Specialist' : null;
+
       const result = await pool.query(
         `INSERT INTO appointments 
          (patient_id, appt_date, appt_time, treatment, source, patient_type, notes, status, htpg_consult, triage_status) 
@@ -159,6 +162,11 @@ export async function handleAppointments(req) {
       const id = url.pathname.split('/')[3];
       const body = await req.json();
       
+      // VALIDATION: Check the date BEFORE touching the database
+      if (body.next_appt_date && !verifyOperationalDate(body.next_appt_date)) {
+         return new Response(JSON.stringify({ error: 'Follow-up date must be an operational bi-weekly Tuesday.' }), { status: 400 });
+      }
+
       // We wrap this in a transaction because we might need to create a future appointment
       const client = await pool.connect();
       try {
@@ -168,18 +176,16 @@ export async function handleAppointments(req) {
         
         // If they want to schedule a follow-up (Ulangan)
         if (body.next_appt_date) {
-          if (!verifyOperationalDate(body.next_appt_date)) {
-             throw new Error('Follow-up date is not a valid bi-weekly clinic day.');
-          }
-          
           // Get current appointment details to duplicate for the follow-up
           const currentAppt = await client.query(`SELECT * FROM appointments WHERE id = $1`, [id]);
           const appt = currentAppt.rows[0];
           
+          // UPDATED: Added missing htpg_consult and triage_status columns
           const newAppt = await client.query(
-            `INSERT INTO appointments (patient_id, appt_date, appt_time, source, treatment, patient_type, status, notes)
-             VALUES ($1, $2, $3, $4, $5, 'Ulangan', 'Scheduled', $6) RETURNING id`,
-            [appt.patient_id, body.next_appt_date, body.next_appt_time || '08:00:00', appt.source, 'Review', body.notes]
+            `INSERT INTO appointments 
+             (patient_id, appt_date, appt_time, source, treatment, patient_type, status, notes, htpg_consult, triage_status)
+             VALUES ($1, $2, $3, $4, $5, 'Ulangan', 'Scheduled', $6, $7, 'Scheduled') RETURNING id`,
+            [appt.patient_id, body.next_appt_date, body.next_appt_time || '08:00:00', appt.source, 'Review', body.notes, appt.htpg_consult || 'None']
           );
           nextVisitId = newAppt.rows[0].id;
         }

@@ -242,9 +242,14 @@ function App() {
         headers: getAuthHeaders(), 
         body: JSON.stringify(payload)
       });
+      
       if (response.ok) {
         setRefreshKey(old => old + 1);
         setIsDrawerOpen(false); 
+      } else {
+        // ---> NEW: Alert the user if they picked an invalid date! <---
+        const errData = await response.json();
+        alert(errData.error || "Failed to complete checkout.");
       }
     } catch (error) { 
       console.error(error); 

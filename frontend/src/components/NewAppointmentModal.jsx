@@ -269,7 +269,7 @@ export default function NewAppointmentModal({ isOpen, onClose, token, selectedDa
             
             {/* 5. HTPG KPI (NEW) */}
             <div className="col-span-2 p-3 bg-purple-50 border border-purple-100 rounded-lg mt-2">
-              <label className="block text-xs font-bold text-purple-900 mb-1">State KPI Tracking (HTPG Consults)</label>
+              <label className="block text-xs font-bold text-purple-900 mb-1">State KPI Tracking (HOSPITAL TAIPING Consults)</label>
               <select 
                 name="htpg_consult" value={formData.htpg_consult} onChange={handleChange} 
                 className="w-full border border-purple-200 rounded-md p-2 text-sm focus:ring-purple-500 bg-white text-purple-900"
@@ -284,7 +284,7 @@ export default function NewAppointmentModal({ isOpen, onClose, token, selectedDa
 
             <div className="col-span-2">
               <label className="block text-xs font-bold text-gray-700 mb-1">Initial Notes</label>
-              <textarea name="notes" value={formData.notes} onChange={handleChange} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-[#0D9488]" rows="2"></textarea>
+              <textarea name="notes" value={formData.notes} onChange={handleChange} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-[#0D9488]" rows="2" placeholder="e.g MOS 38, xla 37, retained root 25.."></textarea>
             </div>
           </div>
 

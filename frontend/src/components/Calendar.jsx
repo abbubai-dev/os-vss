@@ -81,20 +81,55 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
     }
   };
 
+  // --- NEW: Calculate Custom Date Colors & Counts ---
+  const activeCustomDate = customDate || (upcomingDates.includes(selectedDate) ? '' : selectedDate);
+  const customDateCount = activeCustomDate ? getCountForDate(activeCustomDate) : 0;
+  
+  let customBoxColor = "bg-white border-gray-200 text-gray-500";
+  let customTextColor = "text-[#0D9488]";
+  
+  if (activeCustomDate) {
+    if (customDateCount > 20) {
+      customBoxColor = "bg-red-50 border-red-200";
+      customTextColor = "text-red-700";
+    } else if (customDateCount > 10) {
+      customBoxColor = "bg-amber-50 border-amber-200";
+      customTextColor = "text-amber-700";
+    } else if (customDateCount > 0) {
+      customBoxColor = "bg-emerald-50 border-emerald-200";
+      customTextColor = "text-emerald-700";
+    } else {
+      customBoxColor = "bg-slate-50 border-slate-300";
+      customTextColor = "text-slate-700";
+    }
+  }
+
   return (
     <div className="mb-8">
       <div className="flex justify-between items-center mb-3">
         <h2 className="text-sm font-bold text-[#1E3A8A] uppercase tracking-wider">Upcoming Specialist Sessions</h2>
         
-        {/* NEW: Custom Date Picker for the PIC */}
-        <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm">
-          <label className="text-xs font-bold text-gray-500 uppercase">PIC Clinic Date:</label>
+        {/* NEW: Upgraded Dynamic Date Picker for the PIC */}
+        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border shadow-sm transition-colors ${customBoxColor}`}>
+          <label className="text-xs font-bold uppercase opacity-80">PIC Clinic Date:</label>
           <input 
             type="date" 
-            value={customDate || (upcomingDates.includes(selectedDate) ? '' : selectedDate)} 
+            value={activeCustomDate} 
             onChange={handleCustomDateChange}
-            className="text-sm font-bold text-[#0D9488] outline-none cursor-pointer bg-transparent"
+            className={`text-sm font-bold outline-none cursor-pointer bg-transparent ${customTextColor}`}
           />
+          
+          {/* Live Patient Counter Badge */}
+          {activeCustomDate && (
+            <span className={`ml-2 px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
+              customDateCount > 20 ? 'bg-red-200 text-red-900' : 
+              customDateCount > 10 ? 'bg-amber-200 text-amber-900' : 
+              customDateCount > 0 ? 'bg-emerald-200 text-emerald-900' : 
+              'bg-slate-200 text-slate-600'
+            }`}>
+              {customDateCount > 0 ? `${customDateCount} Patients` : 'Empty'}
+            </span>
+          )}
         </div>
       </div>
 

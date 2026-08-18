@@ -882,7 +882,7 @@ function App() {
                     >
                       <option value="X-Ray">X-Ray</option>
                       <option value="Referral">Referral</option>
-                      <option value="Bloodtest">Bloodtest</option>
+                      <option value="Bloodtest">Clinical</option>
                     </select>
                     <input 
                       type="file" 

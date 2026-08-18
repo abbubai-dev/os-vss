@@ -5,15 +5,17 @@ export async function handleAppointments(req) {
   const url = new URL(req.url);
   const method = req.method;
 
-  // 1. GET /api/appointments/counts (Fetch patient density per day)
+  // 1. GET /api/appointments/counts
   if (method === 'GET' && url.pathname === '/api/appointments/counts') {
     try {
       const result = await pool.query(`
-        SELECT appt_date as date, COUNT(*) as count 
+        SELECT 
+          appt_date as date, 
+          COUNT(*) as total_count,
+          SUM(CASE WHEN assigned_to = 'Specialist' THEN 1 ELSE 0 END) as specialist_count,
+          SUM(CASE WHEN assigned_to = 'PIC' THEN 1 ELSE 0 END) as pic_count
         FROM appointments 
-        WHERE status != 'Deleted' 
-          AND triage_status != 'Pending Triage' 
-          AND appt_date IS NOT NULL
+        WHERE status != 'Deleted' AND status != 'Discharged'
         GROUP BY appt_date
       `);
       return new Response(JSON.stringify(result.rows), { status: 200 });

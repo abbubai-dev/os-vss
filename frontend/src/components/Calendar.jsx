@@ -4,18 +4,14 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
   const [densities, setDensities] = useState([]);
   const [customDate, setCustomDate] = useState('');
 
-  const HOLIDAY_SHIFTS = [
-    '2026-09-01' 
-  ]; 
+  const HOLIDAY_SHIFTS = ['2026-09-01']; 
 
-  // --- NEW: Get Today's Date cleanly ---
   const getTodayString = () => {
     const today = new Date();
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   };
   const todayStr = getTodayString();
 
-  // --- NEW: Auto-select Today on initial load ---
   useEffect(() => {
     if (!selectedDate) {
       setSelectedDate(todayStr);
@@ -64,43 +60,40 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
     if (token) fetchCounts();
   }, [token, refreshKey]); 
 
-  const getCountForDate = (dateStr) => {
+  // --- NEW: Auto-Scroll to Today's Card ---
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const todayCard = document.getElementById(`date-card-${todayStr}`);
+      if (todayCard) {
+        todayCard.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      }
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [todayStr, densities]);
+
+  // ---> NEW: Now returns detailed counts! <---
+  const getCountsForDate = (dateStr) => {
     const found = densities.find(d => {
       if (d.date === dateStr) return true;
       const dateObj = new Date(d.date);
       const localDateStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
       return localDateStr === dateStr || String(d.date).substring(0, 10) === dateStr;
     });
-    return found ? parseInt(found.count) : 0;
+    
+    return found ? {
+      total: parseInt(found.total_count) || 0,
+      specialist: parseInt(found.specialist_count) || 0,
+      pic: parseInt(found.pic_count) || 0
+    } : { total: 0, specialist: 0, pic: 0 };
   };
 
-  // --- NEW: Auto-Scroll to Today's Card ---
-  useEffect(() => {
-    // We use a tiny 100ms delay to ensure React has fully drawn the cards on the screen first
-    const timer = setTimeout(() => {
-      const todayCard = document.getElementById(`date-card-${todayStr}`);
-      if (todayCard) {
-        todayCard.scrollIntoView({ 
-          behavior: 'smooth', 
-          inline: 'center', // Centers the card horizontally in the scrolling box
-          block: 'nearest' 
-        });
-      }
-    }, 100);
-    
-    return () => clearTimeout(timer);
-  }, [todayStr, densities]); // Runs when the data loads
-
-  // --- NEW: Create a Unified Timeline of Dates ---
   const upcomingTuesdays = generateUpcomingTuesdays();
   
-  // 1. Extract all active dates from the database that have patients
   const activeDatabaseDates = densities.map(d => {
     const dateObj = new Date(d.date);
     return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
   });
 
-  // 2. Merge Tuesdays, Active Dates, and Today. Remove duplicates, and sort chronologically!
   const allVisibleDates = Array.from(new Set([...upcomingTuesdays, ...activeDatabaseDates, todayStr]))
     .sort((a, b) => new Date(a) - new Date(b));
 
@@ -113,19 +106,22 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
   };
 
   const activeCustomDate = customDate || (allVisibleDates.includes(selectedDate) ? '' : selectedDate);
-  const customDateCount = activeCustomDate ? getCountForDate(activeCustomDate) : 0;
+  const customCounts = activeCustomDate ? getCountsForDate(activeCustomDate) : { total: 0, specialist: 0, pic: 0 };
+  
+  // Track specifically PIC counts for the Jump To box
+  const picCount = customCounts.pic;
   
   let customBoxColor = "bg-white border-gray-200 text-gray-500";
   let customTextColor = "text-[#0D9488]";
   
   if (activeCustomDate) {
-    if (customDateCount > 20) {
+    if (picCount > 20) {
       customBoxColor = "bg-red-50 border-red-200";
       customTextColor = "text-red-700";
-    } else if (customDateCount > 10) {
+    } else if (picCount > 10) {
       customBoxColor = "bg-amber-50 border-amber-200";
       customTextColor = "text-amber-700";
-    } else if (customDateCount > 0) {
+    } else if (picCount > 0) {
       customBoxColor = "bg-emerald-50 border-emerald-200";
       customTextColor = "text-emerald-700";
     } else {
@@ -150,12 +146,12 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
           
           {activeCustomDate && (
             <span className={`ml-2 px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
-              customDateCount > 20 ? 'bg-red-200 text-red-900' : 
-              customDateCount > 10 ? 'bg-amber-200 text-amber-900' : 
-              customDateCount > 0 ? 'bg-emerald-200 text-emerald-900' : 
+              picCount > 20 ? 'bg-red-200 text-red-900' : 
+              picCount > 10 ? 'bg-amber-200 text-amber-900' : 
+              picCount > 0 ? 'bg-emerald-200 text-emerald-900' : 
               'bg-slate-200 text-slate-600'
             }`}>
-              {customDateCount > 0 ? `${customDateCount} Patients` : 'Empty'}
+              {picCount > 0 ? `${picCount} PIC Patients` : 'No PIC Patients'}
             </span>
           )}
         </div>
@@ -163,20 +159,14 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
 
       <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300">
         {allVisibleDates.map(dateStr => {
-          const count = getCountForDate(dateStr);
+          const counts = getCountsForDate(dateStr);
           const isSelected = selectedDate === dateStr;
           
-          let badgeColor = "bg-emerald-100 text-emerald-800";
-          if (count > 10) badgeColor = "bg-amber-100 text-amber-800";
-          if (count > 20) badgeColor = "bg-red-100 text-red-800";
-          if (count === 0) badgeColor = "bg-gray-100 text-gray-500";
+          // ---> NEW: True ONLY if there is at least 1 Specialist patient <---
+          const hasSpecialist = counts.specialist > 0;
 
           const dateObj = new Date(dateStr);
-          const displayDate = dateObj.toLocaleDateString('en-GB', { 
-            day: 'numeric', month: 'short', year: 'numeric' 
-          });
-          
-          // ---> Dynamically calculate the day of the week <---
+          const displayDate = dateObj.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
           const dayName = dateObj.toLocaleDateString('en-GB', { weekday: 'long' });
           const isToday = dateStr === todayStr;
 
@@ -191,22 +181,38 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
               className={`min-w-35 p-4 rounded-xl border-2 cursor-pointer transition-all shrink-0 relative ${
                 isSelected 
                   ? 'border-[#0D9488] bg-teal-50 shadow-md transform scale-105' 
-                  : 'border-gray-200 bg-white hover:border-[#0D9488] hover:shadow-sm'
+                  : hasSpecialist 
+                    ? 'border-purple-300 bg-purple-50 hover:border-purple-400 hover:shadow-md' // <--- Purple only for Specialists!
+                    : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
               }`}
             >
               {isToday && (
-                <span className="absolute -top-2 -right-2 bg-blue-600 text-white text-[10px] font-extrabold px-2 py-1 rounded-full uppercase shadow">
+                <span className="absolute -top-3 -right-2 bg-blue-600 text-white text-[10px] font-extrabold px-2 py-1 rounded-full uppercase shadow-lg">
                   Today
                 </span>
               )}
+              
               <p className={`text-xs font-bold uppercase mb-1 ${isSelected ? 'text-teal-700' : 'text-gray-400'}`}>
                 {dayName}
               </p>
+              
               <p className={`text-lg font-extrabold ${isSelected ? 'text-[#0D9488]' : 'text-gray-800'}`}>
                 {displayDate}
               </p>
-              <div className={`mt-3 inline-block px-2 py-1 rounded text-xs font-bold ${badgeColor}`}>
-                {count > 0 ? `${count} Patients` : 'No Patients'}
+              
+              {/* ---> NEW: Split Badges to clearly show who is booked <--- */}
+              <div className="mt-3 flex flex-col gap-1.5">
+                <span className={`inline-block px-2 py-1 rounded text-[10px] font-extrabold uppercase tracking-wider ${
+                  counts.specialist > 0 ? 'bg-purple-200 text-purple-900' : 'bg-gray-100 text-gray-400'
+                }`}>
+                  {counts.specialist} Specialist
+                </span>
+                
+                <span className={`inline-block px-2 py-1 rounded text-[10px] font-extrabold uppercase tracking-wider ${
+                  counts.pic > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-400'
+                }`}>
+                  {counts.pic} PIC
+                </span>
               </div>
             </div>
           );

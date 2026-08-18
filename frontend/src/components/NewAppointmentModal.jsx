@@ -58,16 +58,16 @@ export default function NewAppointmentModal({ isOpen, onClose, token, selectedDa
     // Auto-Capitalize Name
     if (name === 'name') value = value.toUpperCase();
     
+    // ---> strip dashes/spaces from IC Numbers <---
+    if (name === 'ic_number') value = value.replace(/\D/g, ''); 
+    
     setFormData(prev => {
       const updatedData = { ...prev, [name]: value };
       
       // Auto-Detect Gender from Malaysian IC
-      if (name === 'ic_number') {
-        const cleanIC = value.replace(/\D/g, ''); 
-        if (cleanIC.length === 12) {
-          const lastDigit = parseInt(cleanIC.substring(11, 12));
-          updatedData.gender = (lastDigit % 2 === 0) ? 'Female' : 'Male';
-        }
+      if (name === 'ic_number' && value.length === 12) {
+        const lastDigit = parseInt(value.substring(11, 12));
+        updatedData.gender = (lastDigit % 2 === 0) ? 'Female' : 'Male';
       }
       return updatedData;
     });

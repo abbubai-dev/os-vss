@@ -74,6 +74,23 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
     return found ? parseInt(found.count) : 0;
   };
 
+  // --- NEW: Auto-Scroll to Today's Card ---
+  useEffect(() => {
+    // We use a tiny 100ms delay to ensure React has fully drawn the cards on the screen first
+    const timer = setTimeout(() => {
+      const todayCard = document.getElementById(`date-card-${todayStr}`);
+      if (todayCard) {
+        todayCard.scrollIntoView({ 
+          behavior: 'smooth', 
+          inline: 'center', // Centers the card horizontally in the scrolling box
+          block: 'nearest' 
+        });
+      }
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, [todayStr, densities]); // Runs when the data loads
+
   // --- NEW: Create a Unified Timeline of Dates ---
   const upcomingTuesdays = generateUpcomingTuesdays();
   
@@ -159,13 +176,14 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
             day: 'numeric', month: 'short', year: 'numeric' 
           });
           
-          // ---> NEW: Dynamically calculate the day of the week! <---
+          // ---> Dynamically calculate the day of the week <---
           const dayName = dateObj.toLocaleDateString('en-GB', { weekday: 'long' });
           const isToday = dateStr === todayStr;
 
           return (
             <div 
               key={dateStr}
+              id={`date-card-${dateStr}`}
               onClick={() => {
                 setSelectedDate(dateStr);
                 setCustomDate(''); 

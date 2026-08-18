@@ -90,7 +90,8 @@ export default function MOUploader({ token }) {
           <input 
             type="text" 
             value={ic} 
-            onChange={(e) => setIc(e.target.value)} 
+            // --->  Forces the IC state to only accept numbers <---
+            onChange={(e) => setIc(e.target.value.replace(/\D/g, ''))} 
             onBlur={handleICBlur}
             placeholder="e.g., 901230085521"
             className="w-full border border-gray-300 rounded p-3 text-sm focus:ring-[#0D9488] outline-none transition-all"
@@ -115,7 +116,7 @@ export default function MOUploader({ token }) {
           >
             <option value="X-Ray">X-Ray Image</option>
             <option value="Referral">Referral Letter</option>
-            <option value="Bloodtest">Blood Test Results</option>
+            <option value="Bloodtest">Clinical</option>
           </select>
 
           <input 

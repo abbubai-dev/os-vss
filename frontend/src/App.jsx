@@ -90,6 +90,16 @@ function App() {
   //Triage modal States
   const [isTriageModalOpen, setIsTriageModalOpen] = useState(false);
 
+  // --- STATES FOR CHECKOUT & FOLLOW-UP ---
+  const [checkoutDate, setCheckoutDate] = useState('');
+  const [checkoutTime, setCheckoutTime] = useState('');
+  const [checkoutClinic, setCheckoutClinic] = useState('Specialist');
+
+  // --- STATES FOR RESCHEDULE ---
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleTime, setRescheduleTime] = useState('');
+  const [rescheduleClinic, setRescheduleClinic] = useState('Specialist');
+
   const getAuthHeaders = (json = true) => {
     const headers = { 'Authorization': `Bearer ${token}` };
     if (json) headers['Content-Type'] = 'application/json';
@@ -203,38 +213,47 @@ function App() {
 
   const handleReschedule = async (e) => {
     e.preventDefault();
-    if (!nextTime) return alert("Select a time slot.");
+    
+    const payload = {
+      new_date: nextDate,
+      new_time: nextTime, // Assuming renderTimeGrid sets a state called nextTime
+      assigned_to: rescheduleClinic
+    };
+
     try {
       const response = await fetch(`/api/appointments/${selectedPatient.id}/reschedule`, {
-        method: 'PATCH',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ new_date: nextDate, new_time: nextTime })
+        method: 'PATCH', 
+        headers: getAuthHeaders(), 
+        body: JSON.stringify(payload)
       });
+      
       if (response.ok) {
         setRefreshKey(old => old + 1);
-        setIsRescheduling(false);
-        setIsDrawerOpen(false);
+        setIsDrawerOpen(false); 
+        // Reset states
+        setRescheduleDate('');
+        setRescheduleTime('');
+        setRescheduleClinic('Specialist');
+      } else {
+        const errData = await response.json();
+        alert(errData.error || "Failed to reschedule.");
       }
-    } catch (err) { 
-      console.error(err); 
+    } catch (error) { 
+      console.error(error); 
     }
   };
 
   const handleCheckout = async (e) => {
     e.preventDefault();
-    if (checkoutAction === 'followup' && !nextTime) {
-      return alert("Select a time slot for follow-up.");
-    }
-
+    
     const payload = { 
       status: 'Discharged', 
-      notes: checkoutNotes 
+      notes: checkoutNotes,
+      // Only send the date/time if they selected 'followup'
+      next_appt_date: checkoutAction === 'followup' ? nextDate : null,
+      next_appt_time: checkoutAction === 'followup' ? nextTime : null,
+      assigned_to: checkoutAction === 'followup' ? checkoutClinic : null
     };
-
-    if (checkoutAction === 'followup') {
-      payload.next_appt_date = nextDate;
-      payload.next_appt_time = nextTime;
-    }
 
     try {
       const response = await fetch(`/api/appointments/${selectedPatient.id}/checkout`, {
@@ -246,8 +265,12 @@ function App() {
       if (response.ok) {
         setRefreshKey(old => old + 1);
         setIsDrawerOpen(false); 
+        // Reset states after success
+        setCheckoutDate('');
+        setCheckoutTime('');
+        setCheckoutNotes('');
+        setCheckoutClinic('Specialist');
       } else {
-        // ---> NEW: Alert the user if they picked an invalid date! <---
         const errData = await response.json();
         alert(errData.error || "Failed to complete checkout.");
       }
@@ -778,6 +801,19 @@ function App() {
                      
                      <label className="block text-xs font-bold text-gray-700 mb-1">Select Available Time</label>
                      {renderTimeGrid()}
+
+                     {/* ---> NEW: Target Clinic Dropdown <--- */}
+                     <div className="mt-4">
+                       <label className="block text-xs font-bold text-gray-700 mb-1">Target Clinic</label>
+                       <select 
+                         value={rescheduleClinic} 
+                         onChange={(e) => setRescheduleClinic(e.target.value)} 
+                         className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-[#0D9488] bg-white outline-none"
+                       >
+                         <option value="Specialist">Specialist Clinic</option>
+                         <option value="PIC">PIC Clinic (Medical Officer)</option>
+                       </select>
+                     </div>
                      
                      <div className="flex gap-2 mt-4">
                        <button 
@@ -845,6 +881,19 @@ function App() {
                         
                         <label className="block text-xs font-bold text-gray-700 mb-1">Select Available Time</label>
                         {renderTimeGrid()}
+
+                        {/* ---> NEW: Target Clinic Dropdown <--- */}
+                        <div className="mt-4">
+                          <label className="block text-xs font-bold text-gray-700 mb-1">Assign To Clinic</label>
+                          <select 
+                            value={checkoutClinic} 
+                            onChange={(e) => setCheckoutClinic(e.target.value)} 
+                            className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-[#0D9488] bg-white outline-none"
+                          >
+                            <option value="Specialist">Specialist Clinic</option>
+                            <option value="PIC">PIC Clinic (Medical Officer)</option>
+                          </select>
+                        </div>
                       </div>
                     )}
 

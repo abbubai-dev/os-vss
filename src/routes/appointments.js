@@ -1,20 +1,6 @@
 import pool from '../config/db.js';
 import { sendTriageAlert } from '../utils/mailer.js';
 
-// Business Validation Rule: Every 2 weeks on Tuesday
-function verifyOperationalDate(targetDateStr) {
-  const baselineDate = new Date('2026-01-06'); // Reference operational Tuesday
-  const targetDate = new Date(targetDateStr);
-  
-  // 2 represents Tuesday in JavaScript's getDay()
-  if (targetDate.getDay() !== 2) return false;
-  
-  const timeDiff = targetDate.getTime() - baselineDate.getTime();
-  const dayDiff = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
-  
-  return dayDiff % 14 === 0;
-}
-
 export async function handleAppointments(req) {
   const url = new URL(req.url);
   const method = req.method;
@@ -162,12 +148,6 @@ export async function handleAppointments(req) {
       const id = url.pathname.split('/')[3];
       const body = await req.json();
       
-      // VALIDATION: Check the date BEFORE touching the database
-      if (body.next_appt_date && !verifyOperationalDate(body.next_appt_date)) {
-         return new Response(JSON.stringify({ error: 'Follow-up date must be an operational bi-weekly Tuesday.' }), { status: 400 });
-      }
-
-      // We wrap this in a transaction because we might need to create a future appointment
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
@@ -176,21 +156,21 @@ export async function handleAppointments(req) {
         
         // If they want to schedule a follow-up (Ulangan)
         if (body.next_appt_date) {
-          // Get current appointment details to duplicate for the follow-up
           const currentAppt = await client.query(`SELECT * FROM appointments WHERE id = $1`, [id]);
           const appt = currentAppt.rows[0];
           
-          // UPDATED: Added missing htpg_consult and triage_status columns
+          // NEW: We now accept assigned_to from the frontend, defaulting to 'Specialist' if missing
+          const targetClinic = body.assigned_to || 'Specialist';
+
           const newAppt = await client.query(
             `INSERT INTO appointments 
-             (patient_id, appt_date, appt_time, source, treatment, patient_type, status, notes, htpg_consult, triage_status)
-             VALUES ($1, $2, $3, $4, $5, 'Ulangan', 'Scheduled', $6, $7, 'Scheduled') RETURNING id`,
-            [appt.patient_id, body.next_appt_date, body.next_appt_time || '08:00:00', appt.source, 'Review', body.notes, appt.htpg_consult || 'None']
+             (patient_id, appt_date, appt_time, source, treatment, patient_type, status, notes, htpg_consult, triage_status, assigned_to)
+             VALUES ($1, $2, $3, $4, $5, 'Ulangan', 'Scheduled', $6, $7, 'Scheduled', $8) RETURNING id`,
+            [appt.patient_id, body.next_appt_date, body.next_appt_time || '08:00:00', appt.source, 'Review', body.notes, appt.htpg_consult || 'None', targetClinic]
           );
           nextVisitId = newAppt.rows[0].id;
         }
 
-        // Mark the current appointment as Discharged
         const updatedAppt = await client.query(
           `UPDATE appointments SET status = 'Discharged', next_visit_id = $1 WHERE id = $2 RETURNING *`,
           [nextVisitId, id]
@@ -209,15 +189,16 @@ export async function handleAppointments(req) {
     }
   }
   
-  // 7. PATCH /api/appointments/:id/reschedule (Change Date/Time)
+  // 7. PATCH /api/appointments/:id/reschedule (Change Date/Time/Clinic)
   if (method === 'PATCH' && url.pathname.match(/^\/api\/appointments\/[^\/]+\/reschedule$/)) {
     try {
       const id = url.pathname.split('/')[3];
-      const { new_date, new_time } = await req.json();
+      // NEW: Capture assigned_to from the request
+      const { new_date, new_time, assigned_to } = await req.json(); 
       
       const result = await pool.query(
-        `UPDATE appointments SET appt_date = $1, appt_time = $2 WHERE id = $3 RETURNING *`,
-        [new_date, new_time, id]
+        `UPDATE appointments SET appt_date = $1, appt_time = $2, assigned_to = $3 WHERE id = $4 RETURNING *`,
+        [new_date, new_time, assigned_to || 'Specialist', id]
       );
       
       if (result.rowCount === 0) return new Response(JSON.stringify({ error: 'Appointment not found' }), { status: 404 });

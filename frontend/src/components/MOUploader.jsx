@@ -116,7 +116,7 @@ export default function MOUploader({ token }) {
           >
             <option value="X-Ray">X-Ray Image</option>
             <option value="Referral">Referral Letter</option>
-            <option value="Bloodtest">Clinical</option>
+            <option value="Clinical">Clinical</option>
           </select>
 
           <input 

@@ -12,8 +12,14 @@ export default function HolidayModal({ isOpen, onClose, token }) {
   const fetchHolidays = async () => {
     try {
       const res = await fetch('/api/holidays', { headers: { 'Authorization': `Bearer ${token}` } });
-      if (res.ok) setHolidays(await res.json());
-    } catch (err) { console.error("Failed to fetch holidays", err); }
+      if (res.ok) {
+        const data = await res.json();
+        // ---> STRICT ARRAY CHECK <---
+        setHolidays(Array.isArray(data) ? data : []);
+      }
+    } catch (err) { 
+      console.error("Failed to fetch holidays", err); 
+    }
   };
 
   const handleAdd = async (e) => {

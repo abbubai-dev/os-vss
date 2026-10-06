@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import HolidayModal from './HolidayModal'; // <--- NEW: Import the Holiday Manager
+import HolidayModal from './HolidayModal';
 
 export default function Calendar({ selectedDate, setSelectedDate, token, refreshKey }) {
   const [densities, setDensities] = useState([]);
-  const [holidays, setHolidays] = useState([]); // <--- NEW: State for database holidays
+  const [holidays, setHolidays] = useState([]); 
   const [customDate, setCustomDate] = useState('');
-  const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false); // <--- NEW: Modal state
+  const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
 
   const getTodayString = () => {
     const today = new Date();
@@ -14,12 +14,9 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
   const todayStr = getTodayString();
 
   useEffect(() => {
-    if (!selectedDate) {
-      setSelectedDate(todayStr);
-    }
+    if (!selectedDate) setSelectedDate(todayStr);
   }, [selectedDate, setSelectedDate, todayStr]);
 
-  // ---> NEW: Fetch both appointment counts AND holidays simultaneously <---
   const fetchDashboardData = async () => {
     try {
       const [countsRes, holidaysRes] = await Promise.all([
@@ -27,8 +24,15 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
         fetch('/api/holidays', { headers: { 'Authorization': `Bearer ${token}` } })
       ]);
       
-      if (countsRes.ok) setDensities(await countsRes.json());
-      if (holidaysRes.ok) setHolidays(await holidaysRes.json());
+      // ---> STRICT ARRAY CHECKS PREVENT CRASHES <---
+      if (countsRes.ok) {
+        const data = await countsRes.json();
+        setDensities(Array.isArray(data) ? data : []);
+      }
+      if (holidaysRes.ok) {
+        const data = await holidaysRes.json();
+        setHolidays(Array.isArray(data) ? data : []);
+      }
     } catch (error) {
       console.error("Failed to fetch calendar data:", error);
     }
@@ -38,7 +42,6 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
     if (token) fetchDashboardData();
   }, [token, refreshKey]); 
 
-  // Format holidays for easy comparison
   const holidayDates = holidays.map(h => {
     const d = new Date(h.holiday_date);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -47,14 +50,12 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
   const generateUpcomingTuesdays = () => {
     const dates = [];
     let currentDate = new Date('2026-07-07T12:00:00'); 
-    
     for (let i = 0; i < 14; i++) {
       let year = currentDate.getFullYear();
       let month = String(currentDate.getMonth() + 1).padStart(2, '0');
       let day = String(currentDate.getDate()).padStart(2, '0');
       let formattedDate = `${year}-${month}-${day}`;
 
-      // ---> NEW: Check against dynamic database holidays! <---
       if (holidayDates.includes(formattedDate)) {
         currentDate.setDate(currentDate.getDate() + 7);
         year = currentDate.getFullYear();
@@ -72,9 +73,7 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
   useEffect(() => {
     const timer = setTimeout(() => {
       const todayCard = document.getElementById(`date-card-${todayStr}`);
-      if (todayCard) {
-        todayCard.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-      }
+      if (todayCard) todayCard.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
     }, 100);
     return () => clearTimeout(timer);
   }, [todayStr, densities]);
@@ -87,11 +86,7 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
       return localDateStr === dateStr || String(d.date).substring(0, 10) === dateStr;
     });
     
-    return found ? {
-      total: parseInt(found.total_count) || 0,
-      specialist: parseInt(found.specialist_count) || 0,
-      pic: parseInt(found.pic_count) || 0
-    } : { total: 0, specialist: 0, pic: 0 };
+    return found ? { total: parseInt(found.total_count) || 0, specialist: parseInt(found.specialist_count) || 0, pic: parseInt(found.pic_count) || 0 } : { total: 0, specialist: 0, pic: 0 };
   };
 
   const upcomingTuesdays = generateUpcomingTuesdays();
@@ -101,15 +96,11 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
     return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
   });
 
-  const allVisibleDates = Array.from(new Set([...upcomingTuesdays, ...activeDatabaseDates, todayStr]))
-    .sort((a, b) => new Date(a) - new Date(b));
+  const allVisibleDates = Array.from(new Set([...upcomingTuesdays, ...activeDatabaseDates, todayStr])).sort((a, b) => new Date(a) - new Date(b));
 
   const handleCustomDateChange = (e) => {
     const newDate = e.target.value;
-    if (newDate) {
-      setCustomDate(newDate);
-      setSelectedDate(newDate);
-    }
+    if (newDate) { setCustomDate(newDate); setSelectedDate(newDate); }
   };
 
   const activeCustomDate = customDate || (allVisibleDates.includes(selectedDate) ? '' : selectedDate);
@@ -120,19 +111,10 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
   let customTextColor = "text-[#0D9488]";
   
   if (activeCustomDate) {
-    if (picCount > 20) {
-      customBoxColor = "bg-red-50 border-red-200";
-      customTextColor = "text-red-700";
-    } else if (picCount > 10) {
-      customBoxColor = "bg-amber-50 border-amber-200";
-      customTextColor = "text-amber-700";
-    } else if (picCount > 0) {
-      customBoxColor = "bg-emerald-50 border-emerald-200";
-      customTextColor = "text-emerald-700";
-    } else {
-      customBoxColor = "bg-slate-50 border-slate-300";
-      customTextColor = "text-slate-700";
-    }
+    if (picCount > 20) { customBoxColor = "bg-red-50 border-red-200"; customTextColor = "text-red-700"; } 
+    else if (picCount > 10) { customBoxColor = "bg-amber-50 border-amber-200"; customTextColor = "text-amber-700"; } 
+    else if (picCount > 0) { customBoxColor = "bg-emerald-50 border-emerald-200"; customTextColor = "text-emerald-700"; } 
+    else { customBoxColor = "bg-slate-50 border-slate-300"; customTextColor = "text-slate-700"; }
   }
 
   return (
@@ -140,31 +122,16 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
       <div className="flex justify-between items-center mb-3">
         <div className="flex items-center gap-4">
           <h2 className="text-sm font-bold text-[#1E3A8A] uppercase tracking-wider">Clinic Schedule</h2>
-          {/* ---> NEW: Button to open Holiday Manager <--- */}
-          <button 
-            onClick={() => setIsHolidayModalOpen(true)}
-            className="text-[10px] bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-2 py-1 rounded uppercase tracking-wider transition-colors"
-          >
+          <button onClick={() => setIsHolidayModalOpen(true)} className="text-[10px] bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-2 py-1 rounded uppercase tracking-wider transition-colors">
             Manage Holidays
           </button>
         </div>
         
         <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border shadow-sm transition-colors ${customBoxColor}`}>
           <label className="text-xs font-bold uppercase opacity-80">Jump To Date:</label>
-          <input 
-            type="date" 
-            value={activeCustomDate} 
-            onChange={handleCustomDateChange}
-            className={`text-sm font-bold outline-none cursor-pointer bg-transparent ${customTextColor}`}
-          />
-          
+          <input type="date" value={activeCustomDate} onChange={handleCustomDateChange} className={`text-sm font-bold outline-none cursor-pointer bg-transparent ${customTextColor}`} />
           {activeCustomDate && (
-            <span className={`ml-2 px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
-              picCount > 20 ? 'bg-red-200 text-red-900' : 
-              picCount > 10 ? 'bg-amber-200 text-amber-900' : 
-              picCount > 0 ? 'bg-emerald-200 text-emerald-900' : 
-              'bg-slate-200 text-slate-600'
-            }`}>
+            <span className={`ml-2 px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${picCount > 20 ? 'bg-red-200 text-red-900' : picCount > 10 ? 'bg-amber-200 text-amber-900' : picCount > 0 ? 'bg-emerald-200 text-emerald-900' : 'bg-slate-200 text-slate-600'}`}>
               {picCount > 0 ? `${picCount} PIC Patients` : 'No PIC Patients'}
             </span>
           )}
@@ -176,7 +143,7 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
           const counts = getCountsForDate(dateStr);
           const isSelected = selectedDate === dateStr;
           const hasSpecialist = counts.specialist > 0;
-          const isHoliday = holidayDates.includes(dateStr); // Check if it's a holiday
+          const isHoliday = holidayDates.includes(dateStr); 
 
           const dateObj = new Date(dateStr);
           const displayDate = dateObj.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -184,69 +151,21 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
           const isToday = dateStr === todayStr;
 
           return (
-            <div 
-              key={dateStr}
-              id={`date-card-${dateStr}`}
-              onClick={() => {
-                setSelectedDate(dateStr);
-                setCustomDate(''); 
-              }}
-              className={`min-w-35 p-4 rounded-xl border-2 cursor-pointer transition-all shrink-0 relative ${
-                isSelected 
-                  ? 'border-[#0D9488] bg-teal-50 shadow-md transform scale-105' 
-                  : hasSpecialist 
-                    ? 'border-purple-300 bg-purple-50 hover:border-purple-400 hover:shadow-md' 
-                    : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
-              }`}
-            >
-              {/* ---> NEW: Holiday Warning Badge <--- */}
-              {isHoliday && (
-                <span className="absolute -top-3 left-2 bg-red-500 text-white text-[9px] font-extrabold px-2 py-1 rounded shadow-sm uppercase tracking-wider z-10">
-                  Holiday
-                </span>
-              )}
-
-              {isToday && (
-                <span className="absolute -top-3 -right-2 bg-blue-600 text-white text-[10px] font-extrabold px-2 py-1 rounded-full uppercase shadow-lg z-10">
-                  Today
-                </span>
-              )}
-              
-              <p className={`text-xs font-bold uppercase mb-1 ${isSelected ? 'text-teal-700' : 'text-gray-400'}`}>
-                {dayName}
-              </p>
-              
-              <p className={`text-lg font-extrabold ${isSelected ? 'text-[#0D9488]' : 'text-gray-800'}`}>
-                {displayDate}
-              </p>
-              
+            <div key={dateStr} id={`date-card-${dateStr}`} onClick={() => { setSelectedDate(dateStr); setCustomDate(''); }} className={`min-w-[140px] p-4 rounded-xl border-2 cursor-pointer transition-all shrink-0 relative ${isSelected ? 'border-[#0D9488] bg-teal-50 shadow-md transform scale-105' : hasSpecialist ? 'border-purple-300 bg-purple-50 hover:border-purple-400 hover:shadow-md' : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'}`}>
+              {isHoliday && <span className="absolute -top-3 left-2 bg-red-500 text-white text-[9px] font-extrabold px-2 py-1 rounded shadow-sm uppercase tracking-wider z-10">Holiday</span>}
+              {isToday && <span className="absolute -top-3 -right-2 bg-blue-600 text-white text-[10px] font-extrabold px-2 py-1 rounded-full uppercase shadow-lg z-10">Today</span>}
+              <p className={`text-xs font-bold uppercase mb-1 ${isSelected ? 'text-teal-700' : 'text-gray-400'}`}>{dayName}</p>
+              <p className={`text-lg font-extrabold ${isSelected ? 'text-[#0D9488]' : 'text-gray-800'}`}>{displayDate}</p>
               <div className="mt-3 flex flex-col gap-1.5">
-                <span className={`inline-block px-2 py-1 rounded text-[10px] font-extrabold uppercase tracking-wider ${
-                  counts.specialist > 0 ? 'bg-purple-200 text-purple-900' : 'bg-gray-100 text-gray-400'
-                }`}>
-                  {counts.specialist} Specialist
-                </span>
-                
-                <span className={`inline-block px-2 py-1 rounded text-[10px] font-extrabold uppercase tracking-wider ${
-                  counts.pic > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-400'
-                }`}>
-                  {counts.pic} PIC
-                </span>
+                <span className={`inline-block px-2 py-1 rounded text-[10px] font-extrabold uppercase tracking-wider ${counts.specialist > 0 ? 'bg-purple-200 text-purple-900' : 'bg-gray-100 text-gray-400'}`}>{counts.specialist} Specialist</span>
+                <span className={`inline-block px-2 py-1 rounded text-[10px] font-extrabold uppercase tracking-wider ${counts.pic > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-400'}`}>{counts.pic} PIC</span>
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* ---> NEW: Render the Holiday Modal <--- */}
-      <HolidayModal 
-        isOpen={isHolidayModalOpen} 
-        onClose={() => {
-          setIsHolidayModalOpen(false);
-          fetchDashboardData(); // Refresh the calendar instantly when they close the modal
-        }} 
-        token={token} 
-      />
+      <HolidayModal isOpen={isHolidayModalOpen} onClose={() => { setIsHolidayModalOpen(false); fetchDashboardData(); }} token={token} />
     </div>
   );
 }

@@ -41,7 +41,12 @@ export default function CheckoutModal({ isOpen, onClose, patient, token, onSucce
     if (!date1 || !isOpen) return;
     fetch(`/api/appointments?date=${date1}`, { headers: { 'Authorization': `Bearer ${token}` } })
       .then(res => res.json())
-      .then(data => setBookedSlots1(data.map(a => a.appt_time.slice(0, 5))))
+      .then(data => {
+        // ---> STRICT ARRAY CHECK <---
+        if (Array.isArray(data)) {
+          setBookedSlots1(data.map(a => a.appt_time.slice(0, 5)));
+        }
+      })
       .catch(err => console.error(err));
   }, [date1, isOpen, token]);
 
@@ -50,10 +55,15 @@ export default function CheckoutModal({ isOpen, onClose, patient, token, onSucce
     if (!date2 || !isOpen) return;
     fetch(`/api/appointments?date=${date2}`, { headers: { 'Authorization': `Bearer ${token}` } })
       .then(res => res.json())
-      .then(data => setBookedSlots2(data.map(a => a.appt_time.slice(0, 5))))
+      .then(data => {
+        // ---> STRICT ARRAY CHECK <---
+        if (Array.isArray(data)) {
+          setBookedSlots2(data.map(a => a.appt_time.slice(0, 5)));
+        }
+      })
       .catch(err => console.error(err));
   }, [date2, isOpen, token]);
-
+  
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (action === 'followup1' && (!date1 || !time1)) return alert("Please complete Date 1");

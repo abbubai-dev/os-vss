@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
+import HolidayModal from './HolidayModal'; // <--- NEW: Import the Holiday Manager
 
 export default function Calendar({ selectedDate, setSelectedDate, token, refreshKey }) {
   const [densities, setDensities] = useState([]);
+  const [holidays, setHolidays] = useState([]); // <--- NEW: State for database holidays
   const [customDate, setCustomDate] = useState('');
-
-  const HOLIDAY_SHIFTS = ['2026-09-01']; 
+  const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false); // <--- NEW: Modal state
 
   const getTodayString = () => {
     const today = new Date();
@@ -18,6 +19,31 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
     }
   }, [selectedDate, setSelectedDate, todayStr]);
 
+  // ---> NEW: Fetch both appointment counts AND holidays simultaneously <---
+  const fetchDashboardData = async () => {
+    try {
+      const [countsRes, holidaysRes] = await Promise.all([
+        fetch('/api/appointments/counts', { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch('/api/holidays', { headers: { 'Authorization': `Bearer ${token}` } })
+      ]);
+      
+      if (countsRes.ok) setDensities(await countsRes.json());
+      if (holidaysRes.ok) setHolidays(await holidaysRes.json());
+    } catch (error) {
+      console.error("Failed to fetch calendar data:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (token) fetchDashboardData();
+  }, [token, refreshKey]); 
+
+  // Format holidays for easy comparison
+  const holidayDates = holidays.map(h => {
+    const d = new Date(h.holiday_date);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
+
   const generateUpcomingTuesdays = () => {
     const dates = [];
     let currentDate = new Date('2026-07-07T12:00:00'); 
@@ -28,7 +54,8 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
       let day = String(currentDate.getDate()).padStart(2, '0');
       let formattedDate = `${year}-${month}-${day}`;
 
-      if (HOLIDAY_SHIFTS.includes(formattedDate)) {
+      // ---> NEW: Check against dynamic database holidays! <---
+      if (holidayDates.includes(formattedDate)) {
         currentDate.setDate(currentDate.getDate() + 7);
         year = currentDate.getFullYear();
         month = String(currentDate.getMonth() + 1).padStart(2, '0');
@@ -43,25 +70,6 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
   };
 
   useEffect(() => {
-    const fetchCounts = async () => {
-      try {
-        const response = await fetch('/api/appointments/counts', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setDensities(data);
-        }
-      } catch (error) {
-        console.error("Failed to fetch calendar counts:", error);
-      }
-    };
-    
-    if (token) fetchCounts();
-  }, [token, refreshKey]); 
-
-  // --- NEW: Auto-Scroll to Today's Card ---
-  useEffect(() => {
     const timer = setTimeout(() => {
       const todayCard = document.getElementById(`date-card-${todayStr}`);
       if (todayCard) {
@@ -71,7 +79,6 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
     return () => clearTimeout(timer);
   }, [todayStr, densities]);
 
-  // ---> NEW: Now returns detailed counts! <---
   const getCountsForDate = (dateStr) => {
     const found = densities.find(d => {
       if (d.date === dateStr) return true;
@@ -107,8 +114,6 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
 
   const activeCustomDate = customDate || (allVisibleDates.includes(selectedDate) ? '' : selectedDate);
   const customCounts = activeCustomDate ? getCountsForDate(activeCustomDate) : { total: 0, specialist: 0, pic: 0 };
-  
-  // Track specifically PIC counts for the Jump To box
   const picCount = customCounts.pic;
   
   let customBoxColor = "bg-white border-gray-200 text-gray-500";
@@ -133,7 +138,16 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
   return (
     <div className="mb-8">
       <div className="flex justify-between items-center mb-3">
-        <h2 className="text-sm font-bold text-[#1E3A8A] uppercase tracking-wider">Clinic Schedule</h2>
+        <div className="flex items-center gap-4">
+          <h2 className="text-sm font-bold text-[#1E3A8A] uppercase tracking-wider">Clinic Schedule</h2>
+          {/* ---> NEW: Button to open Holiday Manager <--- */}
+          <button 
+            onClick={() => setIsHolidayModalOpen(true)}
+            className="text-[10px] bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-2 py-1 rounded uppercase tracking-wider transition-colors"
+          >
+            Manage Holidays
+          </button>
+        </div>
         
         <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border shadow-sm transition-colors ${customBoxColor}`}>
           <label className="text-xs font-bold uppercase opacity-80">Jump To Date:</label>
@@ -161,9 +175,8 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
         {allVisibleDates.map(dateStr => {
           const counts = getCountsForDate(dateStr);
           const isSelected = selectedDate === dateStr;
-          
-          // ---> NEW: True ONLY if there is at least 1 Specialist patient <---
           const hasSpecialist = counts.specialist > 0;
+          const isHoliday = holidayDates.includes(dateStr); // Check if it's a holiday
 
           const dateObj = new Date(dateStr);
           const displayDate = dateObj.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -182,12 +195,19 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
                 isSelected 
                   ? 'border-[#0D9488] bg-teal-50 shadow-md transform scale-105' 
                   : hasSpecialist 
-                    ? 'border-purple-300 bg-purple-50 hover:border-purple-400 hover:shadow-md' // <--- Purple only for Specialists!
+                    ? 'border-purple-300 bg-purple-50 hover:border-purple-400 hover:shadow-md' 
                     : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
               }`}
             >
+              {/* ---> NEW: Holiday Warning Badge <--- */}
+              {isHoliday && (
+                <span className="absolute -top-3 left-2 bg-red-500 text-white text-[9px] font-extrabold px-2 py-1 rounded shadow-sm uppercase tracking-wider z-10">
+                  Holiday
+                </span>
+              )}
+
               {isToday && (
-                <span className="absolute -top-3 -right-2 bg-blue-600 text-white text-[10px] font-extrabold px-2 py-1 rounded-full uppercase shadow-lg">
+                <span className="absolute -top-3 -right-2 bg-blue-600 text-white text-[10px] font-extrabold px-2 py-1 rounded-full uppercase shadow-lg z-10">
                   Today
                 </span>
               )}
@@ -200,7 +220,6 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
                 {displayDate}
               </p>
               
-              {/* ---> NEW: Split Badges to clearly show who is booked <--- */}
               <div className="mt-3 flex flex-col gap-1.5">
                 <span className={`inline-block px-2 py-1 rounded text-[10px] font-extrabold uppercase tracking-wider ${
                   counts.specialist > 0 ? 'bg-purple-200 text-purple-900' : 'bg-gray-100 text-gray-400'
@@ -218,6 +237,16 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
           );
         })}
       </div>
+
+      {/* ---> NEW: Render the Holiday Modal <--- */}
+      <HolidayModal 
+        isOpen={isHolidayModalOpen} 
+        onClose={() => {
+          setIsHolidayModalOpen(false);
+          fetchDashboardData(); // Refresh the calendar instantly when they close the modal
+        }} 
+        token={token} 
+      />
     </div>
   );
 }

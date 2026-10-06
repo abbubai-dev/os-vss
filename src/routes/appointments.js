@@ -15,7 +15,7 @@ export async function handleAppointments(req) {
           SUM(CASE WHEN assigned_to = 'Specialist' THEN 1 ELSE 0 END) as specialist_count,
           SUM(CASE WHEN assigned_to = 'PIC' THEN 1 ELSE 0 END) as pic_count
         FROM appointments 
-        WHERE status != 'Deleted' AND status != 'Discharged'
+        WHERE status != 'Deleted'
         GROUP BY appt_date
       `);
       return new Response(JSON.stringify(result.rows), { status: 200 });
@@ -73,24 +73,23 @@ export async function handleAppointments(req) {
     }
   }
 
-  //4. POST /api/appointments (Create new appointment OR referral)
+  // 4. POST /api/appointments (Create new appointment OR referral)
   if (method === 'POST' && url.pathname === '/api/appointments') {
     try {
       const { 
-        name, ic_number, phone_number, gender, // <-- NEW: Now capturing the patient's biodata!
-        appt_date, appt_time, treatment, source, patient_type, notes,
+        name, ic_number, phone_number, gender, 
+        appt_date, appt_time, assigned_to, // <--- NEW: Capture assigned_to
+        treatment, source, patient_type, notes,
         htpg_consult 
       } = await req.json();
 
-      // ---> NEW: FIND OR CREATE PATIENT FIRST <---
+      // FIND OR CREATE PATIENT FIRST
       let final_patient_id;
       const existingPatient = await pool.query('SELECT id FROM patients WHERE ic_number = $1', [ic_number]);
       
       if (existingPatient.rowCount > 0) {
-        // Patient exists, use their ID
         final_patient_id = existingPatient.rows[0].id;
       } else {
-        // New patient! Create them in the database and grab their new ID
         const newPatient = await pool.query(
           'INSERT INTO patients (name, ic_number, phone_number, gender) VALUES ($1, $2, $3, $4) RETURNING id',
           [name, ic_number, phone_number, gender]
@@ -101,25 +100,21 @@ export async function handleAppointments(req) {
       // If no date/time is provided, it goes to the Triage Inbox
       const triageStatus = (appt_date && appt_time) ? 'Scheduled' : 'Pending Triage';
 
-      // ---> NEW: Automatically assign to Specialist if scheduled directly <---
-      const defaultAssignee = (appt_date && appt_time) ? 'Specialist' : null;
+      // ---> FIXED: Use the dropdown choice, or fallback to 'Unassigned' if it went to Triage <---
+      const finalAssignee = (appt_date && appt_time) ? (assigned_to || 'Specialist') : 'Unassigned';
 
       const result = await pool.query(
         `INSERT INTO appointments 
-         (patient_id, appt_date, appt_time, treatment, source, patient_type, notes, status, htpg_consult, triage_status) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'Scheduled', $8, $9) RETURNING *`,
-        [final_patient_id, appt_date || null, appt_time || null, treatment, source, patient_type, notes, htpg_consult || 'None', triageStatus]
+         (patient_id, appt_date, appt_time, assigned_to, treatment, source, patient_type, notes, status, htpg_consult, triage_status) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'Scheduled', $9, $10) RETURNING *`,
+        [final_patient_id, appt_date || null, appt_time || null, finalAssignee, treatment, source, patient_type, notes, htpg_consult || 'None', triageStatus]
       );
 
-      // ---> UPDATED: FIRE AUTOMATED EMAIL IF ROUTED TO TRIAGE <---
+      // FIRE AUTOMATED EMAIL IF ROUTED TO TRIAGE
       if (triageStatus === 'Pending Triage') {
-        // We can now just use the 'name' variable directly from the frontend payload!
         sendTriageAlert({
-          name: name || 'Unknown Patient',
-          source: source,
-          treatment: treatment,
-          htpg_consult: htpg_consult || 'None',
-          notes: notes
+          name: name || 'Unknown Patient', source: source, treatment: treatment,
+          htpg_consult: htpg_consult || 'None', notes: notes
         });
       }
       
@@ -160,17 +155,26 @@ export async function handleAppointments(req) {
         if (body.next_appt_date) {
           const currentAppt = await client.query(`SELECT * FROM appointments WHERE id = $1`, [id]);
           const appt = currentAppt.rows[0];
-          
-          // NEW: We now accept assigned_to from the frontend, defaulting to 'Specialist' if missing
           const targetClinic = body.assigned_to || 'Specialist';
 
           const newAppt = await client.query(
             `INSERT INTO appointments 
              (patient_id, appt_date, appt_time, source, treatment, patient_type, status, notes, htpg_consult, triage_status, assigned_to)
              VALUES ($1, $2, $3, $4, $5, 'Ulangan', 'Scheduled', $6, $7, 'Scheduled', $8) RETURNING id`,
-            [appt.patient_id, body.next_appt_date, body.next_appt_time || '08:00:00', appt.source, 'Review', body.notes, appt.htpg_consult || 'None', targetClinic]
+            [appt.patient_id, body.next_appt_date, body.next_appt_time || '08:00:00', appt.source, body.treatment || 'REVIEW', body.notes, appt.htpg_consult || 'None', targetClinic]
           );
           nextVisitId = newAppt.rows[0].id;
+
+          // ---> NEW: SECOND FOLLOW-UP APPOINTMENT <---
+          if (body.next_appt_date_2) {
+            const targetClinic2 = body.assigned_to_2 || 'Specialist';
+            await client.query(
+              `INSERT INTO appointments 
+               (patient_id, appt_date, appt_time, source, treatment, patient_type, status, notes, htpg_consult, triage_status, assigned_to)
+               VALUES ($1, $2, $3, $4, $5, 'Ulangan', 'Scheduled', $6, $7, 'Scheduled', $8)`,
+              [appt.patient_id, body.next_appt_date_2, body.next_appt_time_2 || '08:00:00', appt.source, body.treatment_2 || 'REVIEW', body.notes, appt.htpg_consult || 'None', targetClinic2]
+            );
+          }
         }
 
         const updatedAppt = await client.query(
@@ -225,15 +229,18 @@ export async function handleAppointments(req) {
     }
   }
 
-  // 9. PATCH /api/appointments/:id/notes (Update Initial Notes)
+  // 9. PATCH /api/appointments/:id/notes (Update Notes & Treatment)
   if (method === 'PATCH' && url.pathname.match(/^\/api\/appointments\/[^\/]+\/notes$/)) {
     try {
       const id = url.pathname.split('/')[3];
-      const { notes } = await req.json();
+      const { notes, treatment } = await req.json(); // <--- NEW: Capture treatment
       
       const result = await pool.query(
-        `UPDATE appointments SET notes = $1 WHERE id = $2 RETURNING *`,
-        [notes, id]
+        `UPDATE appointments 
+         SET notes = COALESCE($1, notes), 
+             treatment = COALESCE($2, treatment) 
+         WHERE id = $3 RETURNING *`,
+        [notes, treatment, id]
       );
       
       if (result.rowCount === 0) return new Response(JSON.stringify({ error: 'Appointment not found' }), { status: 404 });
@@ -243,17 +250,24 @@ export async function handleAppointments(req) {
     }
   }
 
-  //10. PATCH /api/appointments/:id/triage-route (PIC assigning date/time and specialist/PIC role)
+  // 10. PATCH /api/appointments/:id/triage-route (PIC assigning date/time and specialist/PIC role)
   if (method === 'PATCH' && url.pathname.match(/^\/api\/appointments\/[^\/]+\/triage-route$/)) {
     try {
       const id = url.pathname.split('/')[3];
-      const { appt_date, appt_time, assigned_to } = await req.json();
+      // ---> NEW: Destructure treatment and htpg_consult
+      const { appt_date, appt_time, assigned_to, treatment, htpg_consult } = await req.json();
       
       const result = await pool.query(
         `UPDATE appointments 
-         SET appt_date = $1, appt_time = $2, assigned_to = $3, triage_status = 'Scheduled'
-         WHERE id = $4 RETURNING *`,
-        [appt_date, appt_time, assigned_to, id]
+         SET appt_date = $1, 
+             appt_time = $2, 
+             assigned_to = $3, 
+             treatment = $4, 
+             htpg_consult = $5, 
+             triage_status = 'Scheduled',
+             status = 'Scheduled'
+         WHERE id = $6 RETURNING *`,
+        [appt_date, appt_time, assigned_to, treatment, htpg_consult, id] // ---> NEW: Passed to query
       );
       
       if (result.rowCount === 0) return new Response(JSON.stringify({ error: 'Not found' }), { status: 404 });
@@ -282,6 +296,79 @@ export async function handleAppointments(req) {
       `, [month, year]);
       
       return new Response(JSON.stringify(result.rows), { status: 200 });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+    }
+  }
+
+  // 12. GET /api/appointments/available-slots (Calculates free time slots for a specific date)
+  if (method === 'GET' && url.pathname === '/api/appointments/available-slots') {
+    const dateParam = url.searchParams.get('date');
+    const excludeId = url.searchParams.get('exclude_id');
+    
+    if (!dateParam) return new Response(JSON.stringify({ error: 'Date is required' }), { status: 400 });
+    
+    try {
+      // Get all booked times for this date
+      let query = `SELECT appt_time FROM appointments WHERE appt_date = $1 AND status != 'Deleted' AND appt_time IS NOT NULL`;
+      let params = [dateParam];
+      
+      // Ignore the current appointment's time if we are rescheduling
+      if (excludeId && excludeId !== 'undefined' && excludeId !== 'null') {
+        query += ` AND id != $2`;
+        params.push(excludeId);
+      }
+      
+      const bookedResult = await pool.query(query, params);
+      
+      // Extract just the "HH:MM" part from the database time string (e.g., "09:00:00" -> "09:00")
+      const bookedTimes = bookedResult.rows.map(row => String(row.appt_time).substring(0, 5)); 
+      
+      // Define your clinic's standard working hours
+      const allSlots = [
+        "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30",
+        "14:00", "14:30", "15:00", "15:30", "16:00", "16:30"
+      ];
+      
+      // Filter out the booked times
+      const availableSlots = allSlots.filter(slot => !bookedTimes.includes(slot));
+      
+      return new Response(JSON.stringify(availableSlots), { status: 200 });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+    }
+  }
+
+  // 13. GET /api/holidays
+  if (method === 'GET' && url.pathname === '/api/holidays') {
+    try {
+      const res = await pool.query('SELECT * FROM holidays ORDER BY holiday_date ASC');
+      return new Response(JSON.stringify(res.rows), { status: 200 });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+    }
+  }
+
+  // 14. POST /api/holidays
+  if (method === 'POST' && url.pathname === '/api/holidays') {
+    try {
+      const { holiday_date, description } = await req.json();
+      await pool.query(
+        'INSERT INTO holidays (holiday_date, description) VALUES ($1, $2) ON CONFLICT (holiday_date) DO NOTHING',
+        [holiday_date, description]
+      );
+      return new Response(JSON.stringify({ success: true }), { status: 201 });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+    }
+  }
+  
+  // 15. DELETE /api/holidays/:id
+  if (method === 'DELETE' && url.pathname.match(/^\/api\/holidays\/[^\/]+$/)) {
+    try {
+      const id = url.pathname.split('/')[3];
+      await pool.query('DELETE FROM holidays WHERE id = $1', [id]);
+      return new Response(JSON.stringify({ success: true }), { status: 200 });
     } catch (err) {
       return new Response(JSON.stringify({ error: err.message }), { status: 500 });
     }

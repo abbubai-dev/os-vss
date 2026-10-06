@@ -3,15 +3,15 @@ import { useState, useEffect } from 'react';
 const TIME_SLOTS = ['08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '14:00', '14:30', '15:00', '15:30', '16:00'];
 
 export default function NewAppointmentModal({ isOpen, onClose, token, selectedDate, onSuccess, userRole }) {
-  // We keep your awesome single formData state!
+  
   const [formData, setFormData] = useState({
     name: '', ic_number: '', phone_number: '', gender: 'Male',
-    appt_date: selectedDate, appt_time: '', source: 'KPP', treatment: 'MOS', notes: '',
-    htpg_consult: 'None' // NEW KPI State
+    appt_date: selectedDate, appt_time: '', 
+    assigned_to: 'Specialist', // <--- NEW: Default to Specialist
+    source: 'KPP', treatment: 'CONSULTATION', notes: '', htpg_consult: 'None' 
   });
   
-  // NEW Routing State
-  const [isReferral, setIsReferral] = useState(true); // Default to Triage Inbox
+  const [isReferral, setIsReferral] = useState(true); 
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCheckingIC, setIsCheckingIC] = useState(false);
@@ -19,7 +19,6 @@ export default function NewAppointmentModal({ isOpen, onClose, token, selectedDa
   const [error, setError] = useState('');
   const [bookedSlots, setBookedSlots] = useState([]); 
 
-  // Fetch booked slots ONLY if we are scheduling directly
   useEffect(() => {
     if (!isOpen || isReferral || !formData.appt_date) return;
     const fetchBookedSlots = async () => {
@@ -36,15 +35,14 @@ export default function NewAppointmentModal({ isOpen, onClose, token, selectedDa
     fetchBookedSlots();
   }, [formData.appt_date, isOpen, isReferral, token]);
 
-  // Reset form every time the modal opens
   useEffect(() => {
     if (isOpen) {
       setFormData({
         name: '', ic_number: '', phone_number: '', gender: 'Male',
-        appt_date: selectedDate, appt_time: '', source: 'KPP', treatment: 'MOS', notes: '',
-        htpg_consult: 'None'
+        appt_date: selectedDate, appt_time: '', assigned_to: 'Specialist', // <--- Ensure state resets
+        source: 'KPP', treatment: 'CONSULTATION', notes: '', htpg_consult: 'None' 
       });
-      setIsReferral(true); // Reset to Triage by default
+      setIsReferral(true); 
       setError('');
       setAutoFillSuccess(false);
     }
@@ -55,16 +53,11 @@ export default function NewAppointmentModal({ isOpen, onClose, token, selectedDa
   const handleChange = (e) => {
     let { name, value } = e.target;
     
-    // Auto-Capitalize Name
     if (name === 'name') value = value.toUpperCase();
-    
-    // ---> strip dashes/spaces from IC Numbers <---
     if (name === 'ic_number') value = value.replace(/\D/g, ''); 
     
     setFormData(prev => {
       const updatedData = { ...prev, [name]: value };
-      
-      // Auto-Detect Gender from Malaysian IC
       if (name === 'ic_number' && value.length === 12) {
         const lastDigit = parseInt(value.substring(11, 12));
         updatedData.gender = (lastDigit % 2 === 0) ? 'Female' : 'Male';
@@ -73,7 +66,6 @@ export default function NewAppointmentModal({ isOpen, onClose, token, selectedDa
     });
   };
 
-  // Check IC and auto-fill data
   const handleICBlur = async () => {
     const ic = formData.ic_number.trim();
     if (!ic) return;
@@ -107,18 +99,17 @@ export default function NewAppointmentModal({ isOpen, onClose, token, selectedDa
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // Only require a time slot if they are booking directly
     if (!isReferral && !formData.appt_time) return setError("Please select a valid time slot.");
     
     setIsSubmitting(true);
     setError('');
 
-    // Prepare payload, nullifying date/time if it's going to the Triage Inbox
     const payload = {
       ...formData,
       appt_date: isReferral ? null : formData.appt_date,
       appt_time: isReferral ? null : formData.appt_time,
-      patient_type: 'Baru' // Defaulted safely
+      assigned_to: isReferral ? null : formData.assigned_to, // <--- Send assignment if scheduling directly
+      patient_type: 'Baru' 
     };
 
     try {
@@ -155,7 +146,6 @@ export default function NewAppointmentModal({ isOpen, onClose, token, selectedDa
         <form onSubmit={handleSubmit} className="p-6">
           {error && <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-md text-sm text-red-700 font-bold">{error}</div>}
 
-          {/* 1. PATIENT BIODATA (Your awesome original code) */}
           <div className="flex justify-between items-end mb-4 border-b pb-2">
              <h3 className="text-xs uppercase text-[#0D9488] font-extrabold tracking-wider">Patient Biodata</h3>
              {isCheckingIC && <span className="text-[10px] text-gray-400 font-bold uppercase animate-pulse">Checking records...</span>}
@@ -190,7 +180,6 @@ export default function NewAppointmentModal({ isOpen, onClose, token, selectedDa
 
           <h3 className="text-xs uppercase text-[#0D9488] font-extrabold tracking-wider mb-4 border-b pb-2">Clinical Details</h3>
           
-          {/* 2. ROUTING TOGGLE (Hidden for District MOs - Forced to Triage) */}
           {userRole !== 'mo' && (
             <div className="mb-6 p-4 border rounded-lg bg-slate-50 border-slate-200">
               <label className="block text-sm font-bold text-gray-700 mb-3">Routing Method</label>
@@ -207,42 +196,51 @@ export default function NewAppointmentModal({ isOpen, onClose, token, selectedDa
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            
-            {/* 3. CONDITIONAL DATE & TIME SLOTS (Your awesome grid returns here!) */}
-            {!isReferral && (
-              <>
-                <div className="col-span-2">
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Target Date</label>
-                  <input type="date" name="appt_date" required={!isReferral} value={formData.appt_date} onChange={handleChange} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-[#0D9488]" />
-                </div>
-                
-                <div className="col-span-2 bg-slate-50 p-4 rounded-lg border border-slate-200 mt-2 mb-2">
-                  <label className="block text-xs font-bold text-gray-700 mb-2">Select Available Time Slot</label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {TIME_SLOTS.map(slot => {
-                      const isBooked = bookedSlots.includes(slot);
-                      const isSelected = formData.appt_time === slot;
-                      return (
-                        <button
-                          type="button" key={slot} disabled={isBooked}
-                          onClick={() => setFormData({ ...formData, appt_time: slot })}
-                          className={`py-2 px-1 text-xs font-bold rounded border transition-colors ${
-                            isBooked ? 'bg-red-50 text-red-400 border-red-200 cursor-not-allowed' :
-                            isSelected ? 'bg-[#1E3A8A] text-white border-[#1E3A8A] shadow-md' :
-                            'bg-white text-gray-700 border-gray-300 hover:border-[#0D9488] hover:text-[#0D9488]'
-                          }`}
-                        >
-                          {isBooked ? 'Full' : slot}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              </>
-            )}
+          {/* ---> FIXED: 3-Column Grid for Date, Time, and Assign To <--- */}
+          {!isReferral && (
+            <div className="grid grid-cols-3 gap-4 mb-6 p-4 border rounded-lg bg-teal-50 border-teal-200">
+              <div>
+                <label className="block text-xs font-bold text-teal-800 mb-1">Date</label>
+                <input 
+                  type="date" 
+                  name="appt_date" 
+                  value={formData.appt_date} 
+                  onChange={handleChange} 
+                  className="w-full border border-teal-300 rounded-md p-2 text-sm focus:ring-[#0D9488] bg-white"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-teal-800 mb-1">Time Slot</label>
+                <select 
+                  name="appt_time" 
+                  value={formData.appt_time} 
+                  onChange={handleChange} 
+                  className="w-full border border-teal-300 rounded-md p-2 text-sm focus:ring-[#0D9488] bg-white"
+                >
+                  <option value="">Select time...</option>
+                  {TIME_SLOTS.map(slot => (
+                    <option key={slot} value={slot} disabled={bookedSlots.includes(slot)}>
+                      {slot} {bookedSlots.includes(slot) ? '(Booked)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-teal-800 mb-1">Assign To</label>
+                <select 
+                  name="assigned_to" 
+                  value={formData.assigned_to} 
+                  onChange={handleChange} 
+                  className="w-full border border-teal-300 rounded-md p-2 text-sm focus:ring-[#0D9488] bg-white font-semibold"
+                >
+                  <option value="Specialist">Specialist</option>
+                  <option value="PIC">PIC Clinic</option>
+                </select>
+              </div>
+            </div>
+          )}
 
-            {/* 4. SOURCE & TREATMENT */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1">Referral Source</label>
               <select name="source" value={formData.source} onChange={handleChange} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-[#0D9488] bg-white">
@@ -254,31 +252,6 @@ export default function NewAppointmentModal({ isOpen, onClose, token, selectedDa
                 <option value="ED">ED (Oncall)</option>
                 <option value="Hosp. Taiping">Hosp. Taiping</option>
                 <option value="Others">Others</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Management</label>
-              <select name="treatment" value={formData.treatment} onChange={handleChange} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-[#0D9488] bg-white">
-                <option value="MOS">MOS</option>
-                <option value="Review">Review</option>
-                <option value="HPE">HPE</option>
-                <option value="Others">Others</option>
-              </select>
-            </div>
-            
-            {/* 5. HTPG KPI (NEW) */}
-            <div className="col-span-2 p-3 bg-purple-50 border border-purple-100 rounded-lg mt-2">
-              <label className="block text-xs font-bold text-purple-900 mb-1">State KPI Tracking (HOSPITAL TAIPING Consults)</label>
-              <select 
-                name="htpg_consult" value={formData.htpg_consult} onChange={handleChange} 
-                className="w-full border border-purple-200 rounded-md p-2 text-sm focus:ring-purple-500 bg-white text-purple-900"
-              >
-                <option value="None">No HTPG Consult (Standard Workflow)</option>
-                <option value="KPI 1: Defer to Specialist Visit">KPI 1: Defer to Specialist Visit (Managed Locally)</option>
-                <option value="KPI 2: Cluster PIC Assessment">KPI 2: Cluster PIC Assessment (Temp Measure)</option>
-                <option value="KPI 3: Cluster Admission">KPI 3: Cluster Admission (Reviewed by PIC)</option>
-                <option value="KPI 4: Stabilize & Transfer">KPI 4: Stabilize locally & Transfer to HTPG</option>
               </select>
             </div>
 

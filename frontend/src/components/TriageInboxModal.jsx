@@ -8,11 +8,46 @@ export default function TriageInboxModal({ isOpen, onClose, token, onRouteSucces
   const [routeDate, setRouteDate] = useState('');
   const [routeTime, setRouteTime] = useState('');
   const [assignedTo, setAssignedTo] = useState('PIC');
+  const [routeTreatment, setRouteTreatment] = useState('CONSULTATION');
+  const [routeKPI, setRouteKPI] = useState('None');
   const [isRouting, setIsRouting] = useState(false);
+  const [availableSlots, setAvailableSlots] = useState([]);
 
+  // Fetch the inbox queue when opened
   useEffect(() => {
     if (isOpen) fetchTriageQueue();
   }, [isOpen]);
+
+  // When a referral is selected, reset the form states
+  useEffect(() => {
+    if (selectedReferral) {
+      setRouteTreatment(selectedReferral.treatment || 'CONSULTATION');
+      setRouteKPI(selectedReferral.htpg_consult || 'None');
+      setRouteDate('');
+      setRouteTime('');
+      setAvailableSlots([]);
+    }
+  }, [selectedReferral]);
+
+  // ---> NEW: Fetch available slots dynamically when the Date changes <---
+  useEffect(() => {
+    const fetchAvailableSlots = async () => {
+      if (!routeDate || !selectedReferral) return;
+      try {
+        const res = await fetch(`/api/appointments/available-slots?date=${routeDate}&exclude_id=${selectedReferral.id}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const slots = await res.json();
+          setAvailableSlots(slots);
+          if (slots.length > 0) setRouteTime(slots[0]); // Auto-select first slot
+        }
+      } catch (err) {
+        console.error("Failed to fetch slots", err);
+      }
+    };
+    fetchAvailableSlots();
+  }, [routeDate, selectedReferral, token]);
 
   const fetchTriageQueue = async () => {
     try {
@@ -42,7 +77,9 @@ export default function TriageInboxModal({ isOpen, onClose, token, onRouteSucces
         body: JSON.stringify({
           appt_date: routeDate,
           appt_time: routeTime,
-          assigned_to: assignedTo
+          assigned_to: assignedTo,
+          treatment: routeTreatment, // <--- NEW: Send the exact treatment
+          htpg_consult: routeKPI     // <--- NEW: Send the KPI status
         })
       });
 
@@ -50,8 +87,10 @@ export default function TriageInboxModal({ isOpen, onClose, token, onRouteSucces
         setSelectedReferral(null);
         setRouteDate('');
         setRouteTime('');
-        fetchTriageQueue(); // Refresh the inbox list
-        if (onRouteSuccess) onRouteSuccess(); // Tell App.jsx to refresh the calendar
+        fetchTriageQueue(); 
+        if (onRouteSuccess) onRouteSuccess(); 
+      } else {
+        alert("Failed to route patient.");
       }
     } catch (err) {
       console.error(err);
@@ -92,7 +131,6 @@ export default function TriageInboxModal({ isOpen, onClose, token, onRouteSucces
                   </div>
                   <p className="text-xs text-gray-500 mt-1">Source: {appt.source}</p>
                   
-                  {/* KPI Badge Display */}
                   {appt.htpg_consult !== 'None' && (
                     <span className="inline-block mt-2 bg-purple-100 text-purple-800 text-[10px] font-bold px-2 py-1 rounded">
                       {appt.htpg_consult}
@@ -115,19 +153,52 @@ export default function TriageInboxModal({ isOpen, onClose, token, onRouteSucces
               Select a patient from the inbox to route them.
             </div>
           ) : (
-            <div className="p-6 flex flex-col h-full">
+            <div className="p-6 flex flex-col h-full overflow-y-auto">
               <h3 className="text-lg font-bold text-gray-800 mb-4">Route Patient</h3>
               
               <div className="bg-slate-50 p-3 rounded mb-6 text-sm">
                 <p><strong>Name:</strong> {selectedReferral.name}</p>
                 <p><strong>IC:</strong> {selectedReferral.ic_number}</p>
-                <p><strong>Treatment:</strong> {selectedReferral.treatment}</p>
                 <div className="mt-2 pt-2 border-t border-slate-200">
                   <p className="text-gray-600 italic">"{selectedReferral.notes || 'No notes'}"</p>
                 </div>
               </div>
 
               <div className="space-y-4 flex-1">
+                {/* ---> NEW: Treatment & KPI Dropdowns <--- */}
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Treatment:</label>
+                    <select 
+                      value={routeTreatment}
+                      onChange={e => setRouteTreatment(e.target.value)}
+                      className="w-full p-2 border border-gray-300 rounded focus:ring-[#0D9488] font-semibold text-gray-700 outline-none"
+                    >
+                      <option value="CONSULTATION">Consultation</option>
+                      <option value="SCALING">Scaling</option>
+                      <option value="FILLING">Filling</option>
+                      <option value="BIOPSY">Biopsy</option>
+                      <option value="I&D">I&D</option>
+                      <option value="MOS">MOS</option>
+                      <option value="REVIEW">Review</option>
+                      <option value="HPE">HPE</option>
+                      <option value="OTHERS">Others</option>
+                    </select>
+                  </div>
+                  
+                  <div className="w-1/3">
+                    <label className="block text-sm font-bold text-gray-700 mb-1">KPI:</label>
+                    <select 
+                      value={routeKPI}
+                      onChange={e => setRouteKPI(e.target.value)}
+                      className="w-full p-2 border border-gray-300 rounded focus:ring-[#0D9488] outline-none"
+                    >
+                      <option value="None">None</option>
+                      <option value="HTPG Consult">HTPG Consult</option>
+                    </select>
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Assign To:</label>
                   <select 
@@ -152,17 +223,23 @@ export default function TriageInboxModal({ isOpen, onClose, token, onRouteSucces
                   </div>
                   <div className="flex-1">
                     <label className="block text-sm font-bold text-gray-700 mb-1">Time:</label>
-                    <input 
-                      type="time" 
+                    {/* ---> NEW: Dynamic Time Dropdown <--- */}
+                    <select 
                       value={routeTime} 
                       onChange={e => setRouteTime(e.target.value)}
                       className="w-full p-2 border rounded focus:ring-[#0D9488] outline-none"
-                    />
+                      disabled={!routeDate || availableSlots.length === 0}
+                    >
+                      <option value="">{routeDate ? 'Select Time' : 'Select Date First'}</option>
+                      {availableSlots.map(slot => (
+                        <option key={slot} value={slot}>{slot}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>
 
-              <div className="pt-4 border-t mt-auto">
+              <div className="pt-4 border-t mt-4">
                 <button 
                   onClick={handleRoutePatient}
                   disabled={isRouting}

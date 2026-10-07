@@ -41,7 +41,7 @@ export default function HolidayModal({ isOpen, onClose, token }) {
 
   const handleDelete = async (id) => {
     try {
-      const res = await fetch(`/api/holidays/${id}`, {
+      const res = await fetch(`/api/appointments/holidays/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });

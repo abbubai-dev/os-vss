@@ -360,8 +360,8 @@ export async function handleAppointments(req) {
     }
   }
 
-  // 13. GET /api/holidays
-  if (method === 'GET' && url.pathname === '/api/holidays') {
+  // 13. GET /api/appointments/holidays
+  if (method === 'GET' && url.pathname === '/api/appointments/holidays') {
     try {
       const res = await pool.query('SELECT * FROM holidays ORDER BY holiday_date ASC');
       return new Response(JSON.stringify(res.rows), { status: 200 });
@@ -370,8 +370,8 @@ export async function handleAppointments(req) {
     }
   }
 
-  // 14. POST /api/holidays
-  if (method === 'POST' && url.pathname === '/api/holidays') {
+  // 14. POST /api/appointments/holidays
+  if (method === 'POST' && url.pathname === '/api/appointments/holidays') {
     try {
       const { holiday_date, description } = await req.json();
       await pool.query(
@@ -384,10 +384,10 @@ export async function handleAppointments(req) {
     }
   }
   
-  // 15. DELETE /api/holidays/:id
-  if (method === 'DELETE' && url.pathname.match(/^\/api\/holidays\/[^\/]+$/)) {
+  // 15. DELETE /api/appointments/holidays/:id
+  if (method === 'DELETE' && url.pathname.match(/^\/api\/appointments\/holidays\/[^\/]+$/)) {
     try {
-      const id = url.pathname.split('/')[3];
+      const id = url.pathname.split('/')[4]; // Changed to 4 because the path is longer now!
       await pool.query('DELETE FROM holidays WHERE id = $1', [id]);
       return new Response(JSON.stringify({ success: true }), { status: 200 });
     } catch (err) {

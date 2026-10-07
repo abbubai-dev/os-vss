@@ -151,7 +151,7 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
           const isToday = dateStr === todayStr;
 
           return (
-            <div key={dateStr} id={`date-card-${dateStr}`} onClick={() => { setSelectedDate(dateStr); setCustomDate(''); }} className={`min-w-[140px] p-4 rounded-xl border-2 cursor-pointer transition-all shrink-0 relative ${isSelected ? 'border-[#0D9488] bg-teal-50 shadow-md transform scale-105' : hasSpecialist ? 'border-purple-300 bg-purple-50 hover:border-purple-400 hover:shadow-md' : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'}`}>
+            <div key={dateStr} id={`date-card-${dateStr}`} onClick={() => { setSelectedDate(dateStr); setCustomDate(''); }} className={`min-w-35 p-4 rounded-xl border-2 cursor-pointer transition-all shrink-0 relative ${isSelected ? 'border-[#0D9488] bg-teal-50 shadow-md transform scale-105' : hasSpecialist ? 'border-purple-300 bg-purple-50 hover:border-purple-400 hover:shadow-md' : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'}`}>
               {isHoliday && <span className="absolute -top-3 left-2 bg-red-500 text-white text-[9px] font-extrabold px-2 py-1 rounded shadow-sm uppercase tracking-wider z-10">Holiday</span>}
               {isToday && <span className="absolute -top-3 -right-2 bg-blue-600 text-white text-[10px] font-extrabold px-2 py-1 rounded-full uppercase shadow-lg z-10">Today</span>}
               <p className={`text-xs font-bold uppercase mb-1 ${isSelected ? 'text-teal-700' : 'text-gray-400'}`}>{dayName}</p>

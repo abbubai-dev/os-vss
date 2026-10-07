@@ -76,20 +76,42 @@ export async function handleAppointments(req) {
   // 4. POST /api/appointments (Create new appointment OR referral)
   if (method === 'POST' && url.pathname === '/api/appointments') {
     try {
+      // Notice we are ignoring patient_type from the frontend, we will calculate it ourselves!
       const { 
         name, ic_number, phone_number, gender, 
-        appt_date, appt_time, assigned_to, // <--- NEW: Capture assigned_to
-        treatment, source, patient_type, notes,
-        htpg_consult 
+        appt_date, appt_time, assigned_to, 
+        treatment, source, notes, htpg_consult 
       } = await req.json();
 
-      // FIND OR CREATE PATIENT FIRST
       let final_patient_id;
+      let calculatedPatientType = 'Baru'; // Default to Baru
+
+      // 1. Check if the IC already exists in the database
       const existingPatient = await pool.query('SELECT id FROM patients WHERE ic_number = $1', [ic_number]);
       
       if (existingPatient.rowCount > 0) {
+        // Patient exists! Grab their ID.
         final_patient_id = existingPatient.rows[0].id;
+        
+        // 2. Check if they already have an appointment THIS YEAR
+        // (Use the requested appt_date's year, or the current year if going to Triage)
+        const targetYear = appt_date ? new Date(appt_date).getFullYear() : new Date().getFullYear();
+        
+        const yearlyCheck = await pool.query(`
+          SELECT id FROM appointments 
+          WHERE patient_id = $1 
+            AND EXTRACT(YEAR FROM COALESCE(appt_date, created_at)) = $2
+            AND status != 'Deleted'
+          LIMIT 1
+        `, [final_patient_id, targetYear]);
+        
+        // If they already have an appointment this year, they are 'Ulangan'
+        if (yearlyCheck.rowCount > 0) {
+          calculatedPatientType = 'Ulangan';
+        }
+
       } else {
+        // New patient! Create them in the database.
         const newPatient = await pool.query(
           'INSERT INTO patients (name, ic_number, phone_number, gender) VALUES ($1, $2, $3, $4) RETURNING id',
           [name, ic_number, phone_number, gender]
@@ -97,20 +119,19 @@ export async function handleAppointments(req) {
         final_patient_id = newPatient.rows[0].id;
       }
 
-      // If no date/time is provided, it goes to the Triage Inbox
+      // 3. Handle Routing Status
       const triageStatus = (appt_date && appt_time) ? 'Scheduled' : 'Pending Triage';
-
-      // ---> FIXED: Use the dropdown choice, or fallback to 'Unassigned' if it went to Triage <---
       const finalAssignee = (appt_date && appt_time) ? (assigned_to || 'Specialist') : 'Unassigned';
 
+      // 4. Save the Appointment
       const result = await pool.query(
         `INSERT INTO appointments 
          (patient_id, appt_date, appt_time, assigned_to, treatment, source, patient_type, notes, status, htpg_consult, triage_status) 
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'Scheduled', $9, $10) RETURNING *`,
-        [final_patient_id, appt_date || null, appt_time || null, finalAssignee, treatment, source, patient_type, notes, htpg_consult || 'None', triageStatus]
+        [final_patient_id, appt_date || null, appt_time || null, finalAssignee, treatment, source, calculatedPatientType, notes, htpg_consult || 'None', triageStatus]
       );
 
-      // FIRE AUTOMATED EMAIL IF ROUTED TO TRIAGE
+      // 5. Fire Email Alert if sent to Triage
       if (triageStatus === 'Pending Triage') {
         sendTriageAlert({
           name: name || 'Unknown Patient', source: source, treatment: treatment,

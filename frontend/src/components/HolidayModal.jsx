@@ -11,7 +11,7 @@ export default function HolidayModal({ isOpen, onClose, token }) {
 
   const fetchHolidays = async () => {
     try {
-      const res = await fetch('/api/holidays', { headers: { 'Authorization': `Bearer ${token}` } });
+      const res = await fetch('/api/appointments/holidays', { headers: { 'Authorization': `Bearer ${token}` } });
       if (res.ok) {
         const data = await res.json();
         // ---> STRICT ARRAY CHECK <---
@@ -26,7 +26,7 @@ export default function HolidayModal({ isOpen, onClose, token }) {
     e.preventDefault();
     if (!newDate) return;
     try {
-      const res = await fetch('/api/holidays', {
+      const res = await fetch('/api/appointments/holidays', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ holiday_date: newDate, description: newDesc || 'Clinic Closed' })

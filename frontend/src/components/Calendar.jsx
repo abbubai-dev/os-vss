@@ -21,10 +21,9 @@ export default function Calendar({ selectedDate, setSelectedDate, token, refresh
     try {
       const [countsRes, holidaysRes] = await Promise.all([
         fetch('/api/appointments/counts', { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch('/api/holidays', { headers: { 'Authorization': `Bearer ${token}` } })
+        fetch('/api/appointments/holidays', { headers: { 'Authorization': `Bearer ${token}` } }) // <--- UPDATED
       ]);
       
-      // ---> STRICT ARRAY CHECKS PREVENT CRASHES <---
       if (countsRes.ok) {
         const data = await countsRes.json();
         setDensities(Array.isArray(data) ? data : []);

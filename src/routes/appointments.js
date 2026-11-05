@@ -298,13 +298,18 @@ export async function handleAppointments(req) {
     }
   }
 
-  // 11. GET /api/appointments/kpi-report (Generate State KPI Data using Date Range)
+  // 11. GET /api/appointments/kpi-report (Generate State KPI & FTA Data using Date Range)
   if (method === 'GET' && url.pathname.startsWith('/api/appointments/kpi-report')) {
     const startDate = url.searchParams.get('start_date'); 
     const endDate = url.searchParams.get('end_date'); 
     
+    if (!startDate || !endDate) {
+      return new Response(JSON.stringify({ error: 'Start and End dates are required' }), { status: 400 });
+    }
+
     try {
-      const result = await pool.query(`
+      // 1. Get KPI Data (HTPG Consults)
+      const kpiResult = await pool.query(`
         SELECT htpg_consult as kpi, COUNT(*) as total 
         FROM appointments 
         WHERE htpg_consult != 'None'
@@ -316,7 +321,29 @@ export async function handleAppointments(req) {
         ORDER BY htpg_consult
       `, [startDate, endDate]);
       
-      return new Response(JSON.stringify(result.rows), { status: 200 });
+      // 2. Get FTA for New Cases (Baru) in range
+      const ftaNewResult = await pool.query(`
+        SELECT COUNT(*) as total 
+        FROM appointments 
+        WHERE status = 'FTA' AND patient_type = 'Baru'
+          AND appt_date >= $1 AND appt_date <= $2
+      `, [startDate, endDate]);
+
+      // 3. Get FTA for MOS in range
+      const ftaMosResult = await pool.query(`
+        SELECT COUNT(*) as total 
+        FROM appointments 
+        WHERE status = 'FTA' AND treatment = 'MOS'
+          AND appt_date >= $1 AND appt_date <= $2
+      `, [startDate, endDate]);
+
+      // Combine into a single JSON response
+      return new Response(JSON.stringify({ 
+        kpiData: kpiResult.rows,
+        ftaNew: parseInt(ftaNewResult.rows[0].total) || 0,
+        ftaMos: parseInt(ftaMosResult.rows[0].total) || 0
+      }), { status: 200 });
+
     } catch (err) {
       return new Response(JSON.stringify({ error: err.message }), { status: 500 });
     }

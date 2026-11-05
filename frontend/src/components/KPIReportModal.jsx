@@ -1,118 +1,148 @@
-import { useState } from 'react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { useState, useEffect } from 'react';
 
 export default function KPIReportModal({ isOpen, onClose, token }) {
-  const [month, setMonth] = useState(new Date().getMonth() + 1); // 1-12
-  const [year, setYear] = useState(new Date().getFullYear());
-  const [isGenerating, setIsGenerating] = useState(false);
+  // Setup default dates (First day of current month to Today)
+  const getFirstDayOfMonth = () => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+  };
+  const getTodayStr = () => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  };
 
-  if (!isOpen) return null;
+  const [startDate, setStartDate] = useState(getFirstDayOfMonth());
+  const [endDate, setEndDate] = useState(getTodayStr());
+  
+  const [reportData, setReportData] = useState({ kpiData: [], ftaNew: 0, ftaMos: 0 });
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleGenerate = async () => {
-    setIsGenerating(true);
+  useEffect(() => {
+    if (isOpen) fetchReport();
+  }, [isOpen]);
+
+  const fetchReport = async () => {
+    if (!startDate || !endDate) return;
+    setIsLoading(true);
+    
     try {
-      // 1. Fetch data from backend
-      const res = await fetch(`/api/appointments/kpi-report?month=${month}&year=${year}`, {
+      const res = await fetch(`/api/appointments/kpi-report?start_date=${startDate}&end_date=${endDate}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      const rawData = await res.json();
-
-      // 2. Map data to ensure all 4 KPIs show up (even if the count is 0)
-      const kpiList = [
-        "KPI 1: Defer to Specialist Visit",
-        "KPI 2: Cluster PIC Assessment",
-        "KPI 3: Cluster Admission",
-        "KPI 4: Stabilize & Transfer"
-      ];
-
-      const reportData = kpiList.map(kpiName => {
-        const found = rawData.find(row => row.kpi === kpiName);
-        return [kpiName, found ? found.total : 0];
-      });
-
-      // Calculate total diverted cases
-      const totalCases = reportData.reduce((sum, row) => sum + parseInt(row[1]), 0);
-      reportData.push([{ content: 'Total Cases Diverted from HTPG', styles: { fontStyle: 'bold' } }, { content: totalCases.toString(), styles: { fontStyle: 'bold' } }]);
-
-      // 3. Generate PDF
-      const doc = new jsPDF();
-      const monthName = new Date(year, month - 1).toLocaleString('en-US', { month: 'long' });
-
-      // Title
-      doc.setFontSize(16);
-      doc.setTextColor(30, 58, 138); 
-      doc.text('Laporan Pencapaian KPI Kluster OMFS', 14, 20);
-      
-      doc.setFontSize(11);
-      doc.setTextColor(100);
-      doc.text(`Hospital Kuala Kangsar | Bulan: ${monthName} ${year}`, 14, 28);
-
-      // Table
-      autoTable(doc, {
-        startY: 35,
-        head: [["State KPI Indicator (Diverted Cases)", "Total Patients"]],
-        body: reportData,
-        theme: 'grid',
-        headStyles: { fillColor: [107, 33, 168], textColor: 255, fontStyle: 'bold' }, // Purple Header
-        styles: { fontSize: 10, cellPadding: 5 },
-        columnStyles: {
-          0: { cellWidth: 130 },
-          1: { cellWidth: 40, halign: 'center', fontStyle: 'bold' }
-        }
-      });
-
-      // Signature Area
-      const finalY = doc.lastAutoTable.finalY || 100;
-      doc.text('Disediakan Oleh:', 14, finalY + 30);
-      doc.line(14, finalY + 50, 70, finalY + 50); // Signature line
-      doc.text('Pegawai Pergigian (PIC) / Pakar', 14, finalY + 55);
-
-      // Open PDF
-      window.open(doc.output('bloburl'), '_blank');
-      onClose();
-
+      if (res.ok) {
+        const data = await res.json();
+        setReportData(data);
+      }
     } catch (err) {
-      console.error(err);
-      alert("Failed to generate report.");
+      console.error("Failed to fetch KPI report", err);
     } finally {
-      setIsGenerating(false);
+      setIsLoading(false);
     }
   };
 
+  const handleGenerate = (e) => {
+    e.preventDefault();
+    fetchReport();
+  };
+
+  if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-sm overflow-hidden">
-        <div className="p-4 border-b bg-purple-700 text-white flex justify-between items-center">
-          <h2 className="text-lg font-bold">Generate KPI Report</h2>
-          <button onClick={onClose} className="text-purple-200 hover:text-white text-xl font-bold">&times;</button>
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        
+        <div className="p-5 border-b bg-purple-50 flex justify-between items-center">
+          <div>
+            <h2 className="text-xl font-extrabold text-purple-900">Clinic Reports & KPIs</h2>
+            <p className="text-sm text-purple-700 font-medium">Generate data for any custom date range</p>
+          </div>
+          <button onClick={onClose} className="text-purple-300 hover:text-purple-600 text-3xl font-bold leading-none">&times;</button>
+        </div>
+
+        <div className="p-6 bg-white border-b border-gray-100">
+          <form onSubmit={handleGenerate} className="flex gap-4 items-end">
+            <div className="flex-1">
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Start Date</label>
+              <input 
+                type="date" 
+                value={startDate} 
+                onChange={(e) => setStartDate(e.target.value)} 
+                required
+                className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-purple-500 outline-none" 
+              />
+            </div>
+            <div className="flex-1">
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">End Date</label>
+              <input 
+                type="date" 
+                value={endDate} 
+                onChange={(e) => setEndDate(e.target.value)} 
+                required
+                className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-purple-500 outline-none" 
+              />
+            </div>
+            <button 
+              type="submit" 
+              disabled={isLoading}
+              className="bg-purple-700 hover:bg-purple-800 text-white font-bold py-2 px-6 rounded shadow-sm transition-colors disabled:bg-purple-300"
+            >
+              {isLoading ? 'Loading...' : 'Generate Report'}
+            </button>
+          </form>
+        </div>
+
+        <div className="p-6 flex-1 overflow-y-auto bg-slate-50">
+          {isLoading ? (
+            <p className="text-center text-gray-500 font-bold mt-10">Compiling statistics...</p>
+          ) : (
+            <div className="space-y-6">
+              
+              {/* --- SECTION 1: HTPG Consult KPIs --- */}
+              <div>
+                <h3 className="text-sm font-extrabold text-[#1E3A8A] uppercase tracking-wider mb-3">HTPG Consultations</h3>
+                {reportData.kpiData && reportData.kpiData.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-4">
+                    {reportData.kpiData.map((item, index) => (
+                      <div key={index} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm flex justify-between items-center">
+                        <span className="font-bold text-gray-700">{item.kpi}</span>
+                        <span className="bg-purple-100 text-purple-800 text-lg font-extrabold px-3 py-1 rounded-full">
+                          {item.total}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-white p-4 rounded-lg border border-gray-200 text-center text-gray-500 font-medium">
+                    No HTPG Consults found for this date range.
+                  </div>
+                )}
+              </div>
+
+              {/* --- SECTION 2: Defaulter KPIs (FTA) --- */}
+              <div>
+                <h3 className="text-sm font-extrabold text-red-800 uppercase tracking-wider mb-3">Defaulters (FTA)</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-red-50 p-5 rounded-lg border border-red-200 shadow-sm flex flex-col justify-center items-center">
+                    <span className="text-3xl font-black text-red-700 mb-1">{reportData.ftaNew}</span>
+                    <span className="text-xs font-bold text-red-900 uppercase tracking-wider text-center">
+                      New Patients<br/>(Kes Baru)
+                    </span>
+                  </div>
+                  <div className="bg-orange-50 p-5 rounded-lg border border-orange-200 shadow-sm flex flex-col justify-center items-center">
+                    <span className="text-3xl font-black text-orange-700 mb-1">{reportData.ftaMos}</span>
+                    <span className="text-xs font-bold text-orange-900 uppercase tracking-wider text-center">
+                      Minor Oral Surgery<br/>(MOS)
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          )}
         </div>
         
-        <div className="p-6">
-          <p className="text-sm text-gray-600 mb-4 font-medium">Select the month and year to generate the cluster diversion report for the State Health Director.</p>
-          
-          <div className="flex gap-4 mb-6">
-            <div className="flex-1">
-              <label className="block text-xs font-bold text-gray-700 mb-1">Month</label>
-              <select value={month} onChange={(e) => setMonth(e.target.value)} className="w-full p-2 border rounded focus:ring-purple-500 outline-none font-medium text-gray-700">
-                {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                  <option key={m} value={m}>{new Date(2000, m - 1).toLocaleString('en-US', { month: 'long' })}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex-1">
-              <label className="block text-xs font-bold text-gray-700 mb-1">Year</label>
-              <input type="number" value={year} onChange={(e) => setYear(e.target.value)} className="w-full p-2 border rounded focus:ring-purple-500 outline-none font-medium text-gray-700" />
-            </div>
-          </div>
-
-          <button 
-            onClick={handleGenerate}
-            disabled={isGenerating}
-            className="w-full bg-purple-700 hover:bg-purple-800 text-white font-bold py-3 px-4 rounded transition-colors disabled:bg-gray-400"
-          >
-            {isGenerating ? 'Compiling Data...' : 'Download PDF Report'}
-          </button>
+        <div className="p-4 bg-white border-t border-gray-200 text-center">
+          <p className="text-xs text-gray-400 font-medium">Data includes all scheduled and routed appointments between selected dates.</p>
         </div>
       </div>
     </div>

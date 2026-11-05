@@ -337,11 +337,20 @@ export async function handleAppointments(req) {
           AND appt_date >= $1 AND appt_date <= $2
       `, [startDate, endDate]);
 
+      // 4. ---> NEW: Get FTA for Review in range <---
+      const ftaReviewResult = await pool.query(`
+        SELECT COUNT(*) as total 
+        FROM appointments 
+        WHERE status = 'FTA' AND treatment = 'REVIEW'
+          AND appt_date >= $1 AND appt_date <= $2
+      `, [startDate, endDate]);
+
       // Combine into a single JSON response
       return new Response(JSON.stringify({ 
         kpiData: kpiResult.rows,
         ftaNew: parseInt(ftaNewResult.rows[0].total) || 0,
-        ftaMos: parseInt(ftaMosResult.rows[0].total) || 0
+        ftaMos: parseInt(ftaMosResult.rows[0].total) || 0,
+        ftaReview: parseInt(ftaReviewResult.rows[0].total) || 0 // <--- NEW
       }), { status: 200 });
 
     } catch (err) {

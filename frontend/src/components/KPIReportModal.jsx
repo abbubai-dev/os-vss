@@ -14,7 +14,7 @@ export default function KPIReportModal({ isOpen, onClose, token }) {
   const [startDate, setStartDate] = useState(getFirstDayOfMonth());
   const [endDate, setEndDate] = useState(getTodayStr());
   
-  const [reportData, setReportData] = useState({ kpiData: [], ftaNew: 0, ftaMos: 0 });
+  const [reportData, setReportData] = useState({ kpiData: [], ftaNew: 0, ftaMos: 0, ftaReview: 0 });
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -121,17 +121,27 @@ export default function KPIReportModal({ isOpen, onClose, token }) {
               {/* --- SECTION 2: Defaulter KPIs (FTA) --- */}
               <div>
                 <h3 className="text-sm font-extrabold text-red-800 uppercase tracking-wider mb-3">Defaulters (FTA)</h3>
-                <div className="grid grid-cols-2 gap-4">
+                {/* Changed to grid-cols-3 to fit the new card */}
+                <div className="grid grid-cols-3 gap-4">
                   <div className="bg-red-50 p-5 rounded-lg border border-red-200 shadow-sm flex flex-col justify-center items-center">
                     <span className="text-3xl font-black text-red-700 mb-1">{reportData.ftaNew}</span>
                     <span className="text-xs font-bold text-red-900 uppercase tracking-wider text-center">
                       New Patients<br/>(Kes Baru)
                     </span>
                   </div>
+                  
                   <div className="bg-orange-50 p-5 rounded-lg border border-orange-200 shadow-sm flex flex-col justify-center items-center">
                     <span className="text-3xl font-black text-orange-700 mb-1">{reportData.ftaMos}</span>
                     <span className="text-xs font-bold text-orange-900 uppercase tracking-wider text-center">
                       Minor Oral Surgery<br/>(MOS)
+                    </span>
+                  </div>
+
+                  {/* ---> NEW: Review Card <--- */}
+                  <div className="bg-blue-50 p-5 rounded-lg border border-blue-200 shadow-sm flex flex-col justify-center items-center">
+                    <span className="text-3xl font-black text-blue-700 mb-1">{reportData.ftaReview}</span>
+                    <span className="text-xs font-bold text-blue-900 uppercase tracking-wider text-center">
+                      Follow-up<br/>(Review)
                     </span>
                   </div>
                 </div>

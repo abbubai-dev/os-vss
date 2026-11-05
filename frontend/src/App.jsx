@@ -9,7 +9,8 @@ import CBCTViewerButton from './components/cbct/CBCTViewerButton';
 import TriageInboxModal from './components/TriageInboxModal';
 import KPIReportModal from './components/KPIReportModal';
 import MOUploader from './components/MOUploader';
-import CheckoutModal from './components/CheckoutModal'; // <--- NEW IMPORT
+import CheckoutModal from './components/CheckoutModal';
+import FTATrackingModal from './components/FTATrackingModal';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -57,7 +58,8 @@ function App() {
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isTriageModalOpen, setIsTriageModalOpen] = useState(false);
-  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false); // <--- NEW STATE
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+  const [isFTAModalOpen, setIsFTAModalOpen] = useState(false);
 
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -300,6 +302,13 @@ function App() {
                   <button onClick={() => setIsReportModalOpen(true)} className="bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold py-2 px-4 rounded-md shadow-sm border border-purple-200 transition-colors flex items-center gap-2">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                     Reports
+                  </button>
+                )}
+                {/* FTA Tracking Button (Hidden for Specialists) */}
+                {userRole !== 'specialist' && (
+                  <button onClick={() => setIsFTAModalOpen(true)} className="bg-orange-50 hover:bg-orange-100 text-orange-700 font-bold py-2 px-4 rounded-md shadow-sm border border-orange-200 transition-colors flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                    Defaulters
                   </button>
                 )}
                 {userRole !== 'specialist' && (
@@ -596,7 +605,7 @@ function App() {
       <TriageInboxModal isOpen={isTriageModalOpen} onClose={() => setIsTriageModalOpen(false)} token={token} onRouteSuccess={() => { setIsTriageModalOpen(false); setRefreshKey(old => old + 1); }} />
       <KPIReportModal isOpen={isReportModalOpen} onClose={() => setIsReportModalOpen(false)} token={token} />
       <CheckoutModal isOpen={isCheckoutModalOpen} onClose={() => setIsCheckoutModalOpen(false)} patient={selectedPatient} token={token} onSuccess={() => { setIsDrawerOpen(false); setRefreshKey(old => old + 1); }} />
-      
+      <FTATrackingModal isOpen={isFTAModalOpen} onClose={() => setIsFTAModalOpen(false)} token={token} onSelectPatient={openPatientDetails} />
     </div>
   );
 }

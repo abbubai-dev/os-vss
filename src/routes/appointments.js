@@ -298,10 +298,10 @@ export async function handleAppointments(req) {
     }
   }
 
-  // 11. GET /api/appointments/kpi-report (Generate State KPI Data)
-  if (method === 'GET' && url.pathname === '/api/appointments/kpi-report') {
-    const month = url.searchParams.get('month'); // e.g., '08'
-    const year = url.searchParams.get('year');   // e.g., '2026'
+  // 11. GET /api/appointments/kpi-report (Generate State KPI Data using Date Range)
+  if (method === 'GET' && url.pathname.startsWith('/api/appointments/kpi-report')) {
+    const startDate = url.searchParams.get('start_date'); 
+    const endDate = url.searchParams.get('end_date'); 
     
     try {
       const result = await pool.query(`
@@ -309,12 +309,12 @@ export async function handleAppointments(req) {
         FROM appointments 
         WHERE htpg_consult != 'None'
           AND (
-            (EXTRACT(MONTH FROM appt_date) = $1 AND EXTRACT(YEAR FROM appt_date) = $2)
+            (appt_date >= $1 AND appt_date <= $2)
             OR (appt_date IS NULL AND triage_status = 'Pending Triage') 
           )
         GROUP BY htpg_consult
         ORDER BY htpg_consult
-      `, [month, year]);
+      `, [startDate, endDate]);
       
       return new Response(JSON.stringify(result.rows), { status: 200 });
     } catch (err) {
@@ -390,6 +390,23 @@ export async function handleAppointments(req) {
       const id = url.pathname.split('/')[4]; // Changed to 4 because the path is longer now!
       await pool.query('DELETE FROM holidays WHERE id = $1', [id]);
       return new Response(JSON.stringify({ success: true }), { status: 200 });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+    }
+  }
+
+  // 16. GET /api/appointments/fta (Fetch all defaulters)
+  if (method === 'GET' && url.pathname === '/api/appointments/fta') {
+    try {
+      const result = await pool.query(`
+        SELECT a.*, p.name, p.ic_number, p.phone_number, p.gender,
+               EXISTS(SELECT 1 FROM attachments att WHERE att.patient_id = p.id) as has_attachments
+        FROM appointments a
+        JOIN patients p ON a.patient_id = p.id
+        WHERE a.status = 'FTA'
+        ORDER BY a.appt_date DESC
+      `);
+      return new Response(JSON.stringify(result.rows), { status: 200 });
     } catch (err) {
       return new Response(JSON.stringify({ error: err.message }), { status: 500 });
     }
